@@ -24,6 +24,8 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: "18"
+      - name: Install modules
+        run: npm ci
       - name: Run vite tests
         run: npm run test:vitest -- --coverage --reporter=junit
       - name: Upload coverage
