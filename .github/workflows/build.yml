@@ -23,52 +23,6 @@ jobs:
           name: "build"
           path: "dist"
 
-  log-next-release-version:
-    name: Log next release version
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
-      issues: read
-      pull-requests: read
-      statuses: write
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          lfs: true
-      - uses: actions/setup-node@v3
-        with:
-          node-version: "20"
-      - name: Install modules
-        run: npm ci
-      - name: Set commit status
-        uses: myrotvorets/set-commit-status-action@v2.0.0
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          status: pending
-          context: Next release version
-      - name: Release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          npx semantic-release --dry-run
-          echo "NEXT_RELEASE_VERSION=$(cat .semanticRelease.dryRun.nextReleaseVersion.txt)" >> $GITHUB_ENV
-      - name: Set commit status
-        if: success()
-        uses: myrotvorets/set-commit-status-action@v2.0.0
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          status: success
-          context: Next release version
-          description: ${{ env.NEXT_RELEASE_VERSION }}
-      - name: Set commit status on fail
-        if: failure()
-        uses: myrotvorets/set-commit-status-action@v2.0.0
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          status: failure
-          context: Next release version
-
   release:
     name: Release
     if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/beta'
