@@ -1,0 +1,23 @@
+{
+    "branches": [
+        "master",
+        {"name": "beta", "prerelease": true}
+    ],
+    "ci": true,
+    "plugins": [
+        ["@semantic-release/commit-analyzer", {
+            "preset": "angular",
+            "releaseRules": [
+                {"type": "feat", "scope": "minor", "release": "patch"},
+                {"type": "docs", "scope": "README", "release": "patch"}
+            ]
+        }],
+        "@semantic-release/release-notes-generator",
+        "@semantic-release/npm",
+        "@semantic-release/github",
+        ["@semantic-release/exec", {
+            "verifyReleaseCmd": "echo \"${nextRelease.version}\" > .semanticRelease.dryRun.nextReleaseVersion.txt",
+            "publishCmd": "echo \"${nextRelease.version}\" > .semanticRelease.npmPackage.deployedVersion.txt"
+        }]
+    ]
+}

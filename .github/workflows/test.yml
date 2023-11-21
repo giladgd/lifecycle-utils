@@ -1,0 +1,50 @@
+name: Test
+on: [push]
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+      - name: Install modules
+        run: npm ci
+      - name: ESLint
+        run: npx eslint --ext .js --ext .ts .
+      - name: TypeScript validity
+        run: npm run test:typescript
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+      - name: Run vite tests
+        run: npm run test:vitest -- --coverage --reporter=junit
+      - name: Upload coverage
+        uses: codecov/codecov-action@v2
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/clover.xml
+          flags: unittests
+          fail_ci_if_error: true
+
+  compile-docs:
+    name: Test docs compilation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          lfs: true
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+      - name: Install modules
+        run: npm ci
+      - name: Compile docs
+        run: npm run docs:build
