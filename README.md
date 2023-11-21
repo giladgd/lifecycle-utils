@@ -1,10 +1,11 @@
 # `lifecycle-utils`
 A set of general utilities for the lifecycle of a JS/TS project/library
 
-[![Build](https://github.com/giladgd/lifecycle-utils/actions/workflows/build.yml/badge.svg)](https://github.com/giladgd/lifecycle-utils/actions/workflows/build.yml)
+[![Build](https://github.com/giladgd/lifecycle-utils/actions/workflows/test.yml/badge.svg)](https://github.com/giladgd/lifecycle-utils/actions/workflows/test.yml)
 [![License](https://badgen.net/badge/color/MIT/green?label=license)](https://www.npmjs.com/package/lifecycle-utils)
-[![License](https://badgen.net/badge/color/TypeScript/blue?label=types)](https://www.npmjs.com/package/lifecycle-utils)
+[![Types](https://badgen.net/badge/color/TypeScript/blue?label=types)](https://www.npmjs.com/package/lifecycle-utils)
 [![Version](https://badgen.net/npm/v/lifecycle-utils)](https://www.npmjs.com/package/lifecycle-utils)
+[![codecov](https://codecov.io/gh/giladgd/lifecycle-utils/branch/master/graph/badge.svg)](https://codecov.io/gh/giladgd/lifecycle-utils)
 
 * [Documentation](https://giladgd.github.io/lifecycle-utils/)
 * [Changelog](https://github.com/giladgd/lifecycle-utils/releases)
