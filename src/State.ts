@@ -131,6 +131,7 @@ export class State<T> {
      * If the state changes multiple times in the same microtask, only the last change will be dispatched.
      * If the most recent value is the same as the previous value, no event will be dispatched.
      * Set this to `false` to dispatch events immediately upon state changes.
+     * @returns {StateChangeListenerHandle}
      */
     public static createCombinedChangeListener<const StatesObjects extends readonly State<any>[], const StateTypes = {
         -readonly [Index in keyof StatesObjects]: TypeOfState<StatesObjects[Index]>
