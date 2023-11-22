@@ -25,7 +25,7 @@ Calling `withLock` with the same `scope` and `key` will ensure that the callback
 ```typescript
 import {withLock} from "lifecycle-utils";
 
-const scope = {}; // can be reference to any object you like
+const scope = {}; // can be a reference to any object you like
 const startTime = Date.now();
 
 async function doSomething(index: number): number {
@@ -55,7 +55,7 @@ Check whether a lock is currently active for the given `scope` and `key`.
 ```typescript
 import {isLockActive} from "lifecycle-utils";
 
-const scope = {}; // can be reference to any object you like
+const scope = {}; // can be a reference to any object you like
 
 const res = isLockActive(scope, "myKey");
 console.log(res); // false
@@ -67,7 +67,7 @@ Acquire a lock for the given `scope` and `key`.
 ```typescript
 import {acquireLock} from "lifecycle-utils";
 
-const scope = {}; // can be reference to any object you like
+const scope = {}; // can be a reference to any object you like
 
 const activeLock = await acquireLock(scope, "myKey");
 console.log("lock acquired");
