@@ -1,7 +1,6 @@
 import {describe, expect, test} from "vitest";
 import {acquireLock, isLockActive, withLock} from "../src/index.js";
 
-
 describe("withLock", () => {
     test("lock works", async () => {
         const scope1 = {};
