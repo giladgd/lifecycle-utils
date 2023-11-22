@@ -20,7 +20,9 @@ import {DisposedError} from "./DisposedError.js";
  * ```
  */
 export class DisposeAggregator {
+    /** @internal */
     private readonly _targets: DisposeAggregatorTarget[] = [];
+    /** @internal */
     private _disposed: boolean = false;
 
     public constructor() {
@@ -71,6 +73,7 @@ export class DisposeAggregator {
         return this._targets.length;
     }
 
+    /** @internal */
     private _ensureNotDisposed(): void {
         if (this._disposed)
             throw new DisposedError();

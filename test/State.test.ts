@@ -248,6 +248,64 @@ describe("State", () => {
         vi.useRealTimers();
     });
 
+    test("combined event listener called immediately after registration", async () => {
+        vi.useFakeTimers();
+
+        const state1 = new State(0);
+        const state2 = new State("hi");
+        const state3 = new State(true);
+
+        let currentCombinedValue = [state1.state, state2.state, state3.state];
+        let previousCombinedValue: typeof currentCombinedValue | [undefined, undefined, undefined] = [-1, -1, -1];
+
+        const onStateChange = {
+            event(
+                state: [number, string, boolean],
+                previousState: [number, string, boolean] | [undefined, undefined, undefined]
+            ) {
+                currentCombinedValue = state;
+                previousCombinedValue = previousState;
+            }
+        };
+        const onStateChangeSpy = vi.spyOn(onStateChange, "event");
+
+        const combinedListenerHandle = State.createCombinedChangeListener([state1, state2, state3], (state, previousState) => {
+            expectTypeOf(state).toEqualTypeOf<[number, string, boolean]>();
+            expectTypeOf(previousState).toEqualTypeOf<[number, string, boolean] | [undefined, undefined, undefined]>();
+            onStateChange.event(state, previousState);
+        }, {callInstantlyWithCurrentState: true});
+
+        expect(onStateChangeSpy).toHaveBeenCalledTimes(1);
+        expect(onStateChangeSpy).toHaveBeenCalledWith([0, "hi", true], [undefined, undefined, undefined]);
+        expect(currentCombinedValue).toEqual([0, "hi", true]);
+        expect(previousCombinedValue).toEqual([undefined, undefined, undefined]);
+
+        state1.state = 1;
+        state2.state = "hello";
+        state3.state = false;
+
+        await vi.advanceTimersToNextTimerAsync();
+        expect(onStateChangeSpy).toHaveBeenCalledTimes(2);
+        expect(onStateChangeSpy).toHaveBeenLastCalledWith([1, "hello", false], [0, "hi", true]);
+        expect(currentCombinedValue).toEqual([1, "hello", false]);
+        expect(previousCombinedValue).toEqual([0, "hi", true]);
+
+        combinedListenerHandle.dispose();
+        expect(combinedListenerHandle.disposed).toBe(true);
+
+        state1.state = 2;
+        state2.state = "hi there";
+        state3.state = true;
+
+        await vi.advanceTimersToNextTimerAsync();
+        expect(onStateChangeSpy).toHaveBeenCalledTimes(2);
+        expect(onStateChangeSpy).toHaveBeenLastCalledWith([1, "hello", false], [0, "hi", true]);
+        expect(currentCombinedValue).toEqual([1, "hello", false]);
+        expect(previousCombinedValue).toEqual([0, "hi", true]);
+
+        vi.useRealTimers();
+    });
+
     test("combined event listener with error thrown", async () => {
         vi.useFakeTimers();
 

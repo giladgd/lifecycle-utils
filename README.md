@@ -39,7 +39,7 @@ async function doSomething(index: number): number {
 const res = await Promise.all([
     doSomething(1),
     doSomething(2),
-    doSomething(3),
+    doSomething(3)
 ]);
 
 // index: 1 time: 1000

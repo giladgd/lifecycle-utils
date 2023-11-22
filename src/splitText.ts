@@ -19,7 +19,7 @@ export function splitText<const S extends string[]>(text: string, separators: S)
 
     while (splitIndex >= 0) {
         res.push(text.slice(lastSplitIndex, splitIndex));
-        res.push(new Separator(firstSeparator));
+        res.push(Separator._create(firstSeparator));
 
         lastSplitIndex = splitIndex + firstSeparator.length;
         splitIndex = text.indexOf(firstSeparator, lastSplitIndex);
@@ -48,11 +48,16 @@ export function splitText<const S extends string[]>(text: string, separators: S)
 export class Separator<S extends string> {
     public readonly separator: S;
 
+    private constructor(separator: S) {
+        this.separator = separator;
+    }
+
     /**
      * @internal
      * @param {string} separator
+     * @returns {Separator}
      */
-    public constructor(separator: S) {
-        this.separator = separator;
+    public static _create<S extends string>(separator: S): Separator<S> {
+        return new Separator(separator);
     }
 }

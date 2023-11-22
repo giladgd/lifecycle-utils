@@ -26,7 +26,9 @@ import {DisposedError} from "./DisposedError.js";
  * ```
  */
 export class AsyncDisposeAggregator {
+    /** @internal */
     private readonly _targets: AsyncDisposeAggregatorTarget[] = [];
+    /** @internal */
     private _disposed: boolean = false;
 
     public constructor() {
@@ -100,6 +102,7 @@ export class AsyncDisposeAggregator {
         return this._targets.length;
     }
 
+    /** @internal */
     private _ensureNotDisposed(): void {
         if (this._disposed)
             throw new DisposedError();

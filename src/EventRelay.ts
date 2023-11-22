@@ -32,7 +32,9 @@ import {DisposedError} from "./DisposedError.js";
  * @class EventRelay
  */
 export class EventRelay<T> {
+    /** @internal */
     private readonly _listenerCallbacks: Map<((data: T) => void), Set<EventRelayListenerHandle>>;
+    /** @internal */
     private _disposed: boolean = false;
 
     public constructor() {
@@ -48,7 +50,7 @@ export class EventRelay<T> {
     public createListener(callback: ((data: T) => void)) {
         this._ensureNotDisposed();
 
-        const handle = new EventRelayListenerHandle(() => {
+        const handle = EventRelayListenerHandle._create(() => {
             const handles = this._listenerCallbacks.get(callback);
 
             if (handles != null) {
@@ -117,6 +119,7 @@ export class EventRelay<T> {
         this.dispose();
     }
 
+    /** @internal */
     private _ensureNotDisposed() {
         if (this._disposed)
             throw new DisposedError();
@@ -124,13 +127,10 @@ export class EventRelay<T> {
 }
 
 export class EventRelayListenerHandle {
+    /** @internal */
     private _dispose: (() => void) | null;
 
-    /**
-     * @internal
-     * @param {function(): void} dispose
-     */
-    public constructor(dispose: () => void) {
+    private constructor(dispose: () => void) {
         this._dispose = dispose;
 
         this.dispose = this.dispose.bind(this);
@@ -150,5 +150,14 @@ export class EventRelayListenerHandle {
 
     public get disposed() {
         return this._dispose == null;
+    }
+
+    /**
+     * @internal
+     * @param {function(): void} dispose
+     * @returns {EventRelayListenerHandle}
+     */
+    public static _create(dispose: () => void) {
+        return new EventRelayListenerHandle(dispose);
     }
 }

@@ -18,9 +18,13 @@ const maxTimeoutDelay = 2147483647;
  * ```
  */
 export class LongTimeout {
+    /** @internal */
     private readonly _callback: () => void;
+    /** @internal */
     private readonly _startTime: number;
+    /** @internal */
     private readonly _delay: number;
+    /** @internal */
     private _timeout: ReturnType<typeof setTimeout> | undefined;
 
     public constructor(callback: () => void, delay: number) {
@@ -48,6 +52,7 @@ export class LongTimeout {
         return this._timeout == null;
     }
 
+    /** @internal */
     private _onTimeout() {
         const currentTime = Date.now();
         const timePassed = currentTime - this._startTime;

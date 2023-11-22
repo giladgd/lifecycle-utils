@@ -3,9 +3,13 @@
  * @template T
  */
 export class State<T> {
+    /** @internal */
     private readonly _queueEvents: boolean;
+    /** @internal */
     private readonly _listenerCallbacks: Map<((state: T, lastValue?: T) => void), T>;
+    /** @internal */
     private _state: T;
+    /** @internal */
     private _changeEventMicrotaskQueued: boolean;
 
     /**
@@ -32,10 +36,6 @@ export class State<T> {
     }
 
     public set state(newState: T) {
-        this._setState(newState);
-    }
-
-    private _setState(newState: T) {
         if (this._state === newState)
             return;
 
@@ -65,7 +65,7 @@ export class State<T> {
             }
         }
 
-        return new StateChangeListenerHandle(() => {
+        return StateChangeListenerHandle._create(() => {
             this._listenerCallbacks.delete(callback);
         });
     }
@@ -78,6 +78,10 @@ export class State<T> {
         return this._listenerCallbacks.size;
     }
 
+    /**
+     * @internal
+     * @param {T} newState
+     */
     private _dispatchChangeEvent(newState: T) {
         for (const [listenerCallback, lastValue] of Array.from(this._listenerCallbacks.entries())) {
             if (lastValue === newState)
@@ -195,18 +199,15 @@ export class State<T> {
         if (callInstantlyWithCurrentState)
             dispatchEvent(false, false);
 
-        return new StateChangeListenerHandle(() => handlers.forEach(handler => handler.dispose()));
+        return StateChangeListenerHandle._create(() => handlers.forEach(handler => handler.dispose()));
     }
 }
 
 export class StateChangeListenerHandle {
+    /** @internal */
     private _dispose: (() => void) | null;
 
-    /**
-     * @internal
-     * @param {function(): void} dispose
-     */
-    public constructor(dispose: () => void) {
+    private constructor(dispose: () => void) {
         this._dispose = dispose;
 
         this.dispose = this.dispose.bind(this);
@@ -226,6 +227,15 @@ export class StateChangeListenerHandle {
 
     public get disposed() {
         return this._dispose == null;
+    }
+
+    /**
+     * @internal
+     * @param {function(): void} dispose
+     * @returns {StateChangeListenerHandle}
+     */
+    public static _create(dispose: () => void) {
+        return new StateChangeListenerHandle(dispose);
     }
 }
 
