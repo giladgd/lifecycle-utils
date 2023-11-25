@@ -43,13 +43,13 @@ describe("AsyncDisposeAggregator", () => {
         expect(stub3.disposed).toBe(false);
     });
 
-    test("Symbol.asyncDispose", async () => {
+    test("WeakRef, Symbol.asyncDispose", async () => {
         const disposeAggregator = new AsyncDisposeAggregator();
 
         const stub = new DisposeStub();
         expect(stub.disposed).toBe(false);
 
-        disposeAggregator.add(stub);
+        disposeAggregator.add(new WeakRef(stub));
         expect(disposeAggregator.targetCount).toBe(1);
 
         await disposeAggregator[Symbol.asyncDispose]();

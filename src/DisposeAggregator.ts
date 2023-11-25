@@ -45,12 +45,16 @@ export class DisposeAggregator {
 
     /**
      * Disposes all the targets that have been added and clears the list of targets.
+     * You can wrap the target with a `WeakRef` to prevent this class from holding a strong reference to the target.
      */
     public dispose(): void {
         this._ensureNotDisposed();
 
         while (this._targets.length > 0) {
-            const disposeTarget = this._targets.shift();
+            let disposeTarget = this._targets.shift();
+
+            if (typeof WeakRef !== "undefined" && disposeTarget instanceof WeakRef)
+                disposeTarget = disposeTarget.deref();
 
             if (disposeTarget == null)
                 continue;
@@ -84,4 +88,8 @@ type DisposeAggregatorTarget = (() => void) | {
     [Symbol.dispose](): void
 } | {
     dispose(): void
-};
+} | WeakRef<{
+    [Symbol.dispose](): void
+} | {
+    dispose(): void
+}>;

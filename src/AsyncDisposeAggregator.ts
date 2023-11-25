@@ -57,6 +57,7 @@ export class AsyncDisposeAggregator {
 
     /**
      * Disposes all the targets that have been added and clears the list of targets.
+     * You can wrap the target with a `WeakRef` to prevent this class from holding a strong reference to the target.
      * @returns {Promise<void>}
      */
     public async dispose(): Promise<void> {
@@ -74,6 +75,9 @@ export class AsyncDisposeAggregator {
                     continue;
                 } /* c8 ignore stop */
             }
+
+            if (typeof WeakRef !== "undefined" && disposeTarget instanceof WeakRef)
+                disposeTarget = disposeTarget.deref();
 
             if (disposeTarget == null)
                 continue;
@@ -117,4 +121,10 @@ type DisposeTarget = (() => void | Promise<void>) | {
     [Symbol.dispose](): void
 } | {
     dispose(): void | Promise<void>
-};
+} | WeakRef<{
+    [Symbol.asyncDispose](): void | Promise<void>
+} | {
+    [Symbol.dispose](): void
+} | {
+    dispose(): void | Promise<void>
+}>;
