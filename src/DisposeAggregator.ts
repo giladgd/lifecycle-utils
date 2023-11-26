@@ -20,10 +20,8 @@ import {DisposedError} from "./DisposedError.js";
  * ```
  */
 export class DisposeAggregator {
-    /** @internal */
-    private readonly _targets: DisposeAggregatorTarget[] = [];
-    /** @internal */
-    private _disposed: boolean = false;
+    /** @internal */ private readonly _targets: DisposeAggregatorTarget[] = [];
+    /** @internal */ private _disposed: boolean = false;
 
     public constructor() {
         this.add = this.add.bind(this);
@@ -34,8 +32,6 @@ export class DisposeAggregator {
     /**
      * Adds a target to be disposed.
      * You can wrap the target with a `WeakRef` to prevent this class from holding a strong reference to the target.
-     * @param {(function(): void) | ({dispose: (function(): void)}) | ({Symbol.dispose: (function(): void)})} target
-     * @returns {this}
      */
     public add<T extends DisposeAggregatorTarget>(target: T): T {
         this._ensureNotDisposed();
@@ -84,7 +80,7 @@ export class DisposeAggregator {
     }
 }
 
-type DisposeAggregatorTarget = (() => void) | {
+export type DisposeAggregatorTarget = (() => void) | {
     [Symbol.dispose](): void
 } | {
     dispose(): void

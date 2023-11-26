@@ -2,9 +2,6 @@
  * Split a text by multiple separators, and return a result of the text and separators.
  * For example, `splitText("Hello <and> world [then] !", ["<and>", "[then]"])`
  *   will return `["Hello ", new Separator("<and>"), " world ", new Separator("[then]"), " !"]`
- * @param {string} text
- * @param {Array<string | Separator>} separators
- * @returns {(string | Separator)[]}
  */
 export function splitText<const S extends string[]>(text: string, separators: S): (string | Separator<S[number]>)[] {
     if (separators.length === 0)
@@ -52,11 +49,7 @@ export class Separator<S extends string> {
         this.separator = separator;
     }
 
-    /**
-     * @internal
-     * @param {string} separator
-     * @returns {Separator}
-     */
+    /** @internal */
     public static _create<S extends string>(separator: S): Separator<S> {
         return new Separator(separator);
     }

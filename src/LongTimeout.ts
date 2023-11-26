@@ -18,14 +18,10 @@ const maxTimeoutDelay = 2147483647;
  * ```
  */
 export class LongTimeout {
-    /** @internal */
-    private readonly _callback: () => void;
-    /** @internal */
-    private readonly _startTime: number;
-    /** @internal */
-    private readonly _delay: number;
-    /** @internal */
-    private _timeout: ReturnType<typeof setTimeout> | undefined;
+    /** @internal */ private readonly _callback: () => void;
+    /** @internal */ private readonly _startTime: number;
+    /** @internal */ private readonly _delay: number;
+    /** @internal */ private _timeout: ReturnType<typeof setTimeout> | undefined;
 
     public constructor(callback: () => void, delay: number) {
         this._callback = callback;
@@ -83,9 +79,6 @@ export class LongTimeout {
  * // to clear the timeout, call clearLongTimeout
  * // clearLongTimeout(timeout);
  * ```
- * @param {function(): void} callback
- * @param {number} delay
- * @returns {LongTimeout}
  */
 export function setLongTimeout(callback: () => void, delay: number): LongTimeout {
     return new LongTimeout(callback, delay);
@@ -111,7 +104,6 @@ export function setLongTimeout(callback: () => void, delay: number): LongTimeout
  * clearLongTimeout(timeout);
  * clearLongTimeout(timeout2);
  * ```
- * @param {LongTimeout | number | undefined | null} timeout
  */
 export function clearLongTimeout(timeout: LongTimeout | number | undefined | null | ReturnType<typeof setTimeout>) {
     if (timeout == null)

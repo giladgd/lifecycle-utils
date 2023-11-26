@@ -26,10 +26,8 @@ import {DisposedError} from "./DisposedError.js";
  * ```
  */
 export class AsyncDisposeAggregator {
-    /** @internal */
-    private readonly _targets: AsyncDisposeAggregatorTarget[] = [];
-    /** @internal */
-    private _disposed: boolean = false;
+    /** @internal */ private readonly _targets: AsyncDisposeAggregatorTarget[] = [];
+    /** @internal */ private _disposed: boolean = false;
 
     public constructor() {
         this.add = this.add.bind(this);
@@ -40,14 +38,6 @@ export class AsyncDisposeAggregator {
     /**
      * Adds a target to be disposed.
      * You can wrap the target with a `WeakRef` to prevent this class from holding a strong reference to the target.
-     * @param {(function(): void) | ({dispose: (function(): void)}) | ({Symbol.dispose: (function(): void)}) |
-     *  ({Symbol.asyncDispose: (function(): void)}) |
-     *  Promise<
-     *      (function(): void) | ({dispose: (function(): void)}) | ({Symbol.dispose: (function(): void)}) |
-     *      ({Symbol.asyncDispose: (function(): void)})
-     *      >
-     * } target
-     * @returns {this}
      */
     public add(target: AsyncDisposeAggregatorTarget): this {
         this._ensureNotDisposed();
@@ -58,7 +48,6 @@ export class AsyncDisposeAggregator {
 
     /**
      * Disposes all the targets that have been added and clears the list of targets.
-     * @returns {Promise<void>}
      */
     public async dispose(): Promise<void> {
         this._ensureNotDisposed();
@@ -113,9 +102,9 @@ export class AsyncDisposeAggregator {
     }
 }
 
-type AsyncDisposeAggregatorTarget = DisposeTarget | Promise<DisposeTarget>;
+export type AsyncDisposeAggregatorTarget = AsyncDisposeAggregatorWrappedTarget | Promise<AsyncDisposeAggregatorWrappedTarget>;
 
-type DisposeTarget = (() => void | Promise<void>) | {
+export type AsyncDisposeAggregatorWrappedTarget = (() => void | Promise<void>) | {
     [Symbol.asyncDispose](): void | Promise<void>
 } | {
     [Symbol.dispose](): void

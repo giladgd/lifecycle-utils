@@ -28,14 +28,10 @@ import {DisposedError} from "./DisposedError.js";
  * Something happened: eat a cookie
  * Done notifying listeners
  * ```
- * @template T
- * @class EventRelay
  */
 export class EventRelay<T> {
-    /** @internal */
-    private readonly _listenerCallbacks: Map<((data: T) => void), Set<EventRelayListenerHandle>>;
-    /** @internal */
-    private _disposed: boolean = false;
+    /** @internal */ private readonly _listenerCallbacks: Map<((data: T) => void), Set<EventRelayListenerHandle>>;
+    /** @internal */ private _disposed: boolean = false;
 
     public constructor() {
         this._listenerCallbacks = new Map<((data: T) => void), Set<EventRelayListenerHandle>>();
@@ -152,11 +148,7 @@ export class EventRelayListenerHandle {
         return this._dispose == null;
     }
 
-    /**
-     * @internal
-     * @param {function(): void} dispose
-     * @returns {EventRelayListenerHandle}
-     */
+    /** @internal */
     public static _create(dispose: () => void) {
         return new EventRelayListenerHandle(dispose);
     }

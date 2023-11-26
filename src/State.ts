@@ -1,21 +1,16 @@
 /**
  * `State` is a utility class that allows you to hold a value and notify listeners when the value changes.
- * @template T
  */
 export class State<T> {
-    /** @internal */
-    private readonly _queueEvents: boolean;
-    /** @internal */
-    private readonly _listenerCallbacks: Map<((state: T, lastValue?: T) => void), T>;
-    /** @internal */
-    private _state: T;
-    /** @internal */
-    private _changeEventMicrotaskQueued: boolean;
+    /** @internal */ private readonly _queueEvents: boolean;
+    /** @internal */ private readonly _listenerCallbacks: Map<((state: T, lastValue?: T) => void), T>;
+    /** @internal */ private _state: T;
+    /** @internal */ private _changeEventMicrotaskQueued: boolean;
 
     /**
-     * @param {T} defaultState
-     * @param {object} [options]
-     * @param {boolean} [options.queueEvents=true] - queue events to be dispatched in a microtask.
+     * @param defaultState
+     * @param [options]
+     * @param [options.queueEvents] - queue events to be dispatched in a microtask.
      * If the state changes multiple times in the same microtask, only the last change will be dispatched.
      * If the most recent value is the same as the previous value, no event will be dispatched.
      * Set this to `false` to dispatch events immediately upon state changes.
@@ -78,10 +73,7 @@ export class State<T> {
         return this._listenerCallbacks.size;
     }
 
-    /**
-     * @internal
-     * @param {T} newState
-     */
+    /** @internal */
     private _dispatchChangeEvent(newState: T) {
         for (const [listenerCallback, lastValue] of Array.from(this._listenerCallbacks.entries())) {
             if (lastValue === newState)
@@ -127,15 +119,14 @@ export class State<T> {
      *
      * eventHandle.dispose();
      * ```
-     * @param {Array<State<any>>} states
-     * @param {function(any[]): void} callback
-     * @param {object} [options]
-     * @param {boolean} [options.callInstantlyWithCurrentState=false]
-     * @param {boolean} [options.queueEvents=true] - queue events to be dispatched in a microtask.
+     * @param states
+     * @param callback
+     * @param [options]
+     * @param [options.callInstantlyWithCurrentState]
+     * @param [options.queueEvents] - queue events to be dispatched in a microtask.
      * If the state changes multiple times in the same microtask, only the last change will be dispatched.
      * If the most recent value is the same as the previous value, no event will be dispatched.
      * Set this to `false` to dispatch events immediately upon state changes.
-     * @returns {StateChangeListenerHandle}
      */
     public static createCombinedChangeListener<const StatesObjects extends readonly State<any>[], const StateTypes = {
         -readonly [Index in keyof StatesObjects]: TypeOfState<StatesObjects[Index]>
@@ -229,11 +220,7 @@ export class StateChangeListenerHandle {
         return this._dispose == null;
     }
 
-    /**
-     * @internal
-     * @param {function(): void} dispose
-     * @returns {StateChangeListenerHandle}
-     */
+    /** @internal */
     public static _create(dispose: () => void) {
         return new StateChangeListenerHandle(dispose);
     }
