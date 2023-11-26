@@ -33,6 +33,7 @@ export class DisposeAggregator {
 
     /**
      * Adds a target to be disposed.
+     * You can wrap the target with a `WeakRef` to prevent this class from holding a strong reference to the target.
      * @param {(function(): void) | ({dispose: (function(): void)}) | ({Symbol.dispose: (function(): void)})} target
      * @returns {this}
      */
@@ -45,7 +46,6 @@ export class DisposeAggregator {
 
     /**
      * Disposes all the targets that have been added and clears the list of targets.
-     * You can wrap the target with a `WeakRef` to prevent this class from holding a strong reference to the target.
      */
     public dispose(): void {
         this._ensureNotDisposed();

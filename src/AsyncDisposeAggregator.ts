@@ -39,6 +39,7 @@ export class AsyncDisposeAggregator {
 
     /**
      * Adds a target to be disposed.
+     * You can wrap the target with a `WeakRef` to prevent this class from holding a strong reference to the target.
      * @param {(function(): void) | ({dispose: (function(): void)}) | ({Symbol.dispose: (function(): void)}) |
      *  ({Symbol.asyncDispose: (function(): void)}) |
      *  Promise<
@@ -57,7 +58,6 @@ export class AsyncDisposeAggregator {
 
     /**
      * Disposes all the targets that have been added and clears the list of targets.
-     * You can wrap the target with a `WeakRef` to prevent this class from holding a strong reference to the target.
      * @returns {Promise<void>}
      */
     public async dispose(): Promise<void> {
