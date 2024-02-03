@@ -5,7 +5,11 @@ const locks = new Map<any, Map<string, Promise<any>>>();
  */
 export async function withLock<ReturnType>(scope: any, key: string, callback: () => Promise<ReturnType>): Promise<ReturnType> {
     while (locks.get(scope)?.has(key)) {
-        await locks.get(scope)?.get(key);
+        try {
+            await locks.get(scope)?.get(key);
+        } catch (err) {
+            // we only need to wait here for the promise to resolve, we don't care about the result
+        }
     }
 
     const promise = callback();
@@ -58,6 +62,30 @@ export async function acquireLock<S = any, K extends string = string>(scope: S, 
             releaseLock(null);
         }
     };
+}
+
+/**
+ * Wait for a lock to be released for a given `scope` and `key`.
+ */
+export async function waitForLockRelease(scope: any, key: string): Promise<void> {
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+        try {
+            await locks.get(scope)?.get(key);
+        } catch (err) {
+            // we only need to wait here for the promise to resolve, we don't care about the result
+        }
+
+        if (locks.get(scope)?.has(key))
+            continue;
+
+        await Promise.resolve(); // wait for a microtask to run, so other pending locks can be registered
+
+        if (locks.get(scope)?.has(key))
+            continue;
+
+        return;
+    }
 }
 
 export type Lock<S = any, K extends string = string> = {

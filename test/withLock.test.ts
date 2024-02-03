@@ -1,5 +1,5 @@
 import {describe, expect, test} from "vitest";
-import {acquireLock, isLockActive, withLock} from "../src/index.js";
+import {acquireLock, isLockActive, waitForLockRelease, withLock} from "../src/index.js";
 
 describe("withLock", () => {
     test("lock works", async () => {
@@ -102,5 +102,57 @@ describe("withLock", () => {
         ]);
 
         expect(res).toEqual([1, 2, 3]);
+    });
+
+    test("waitForLockRelease", async () => {
+        const scope1 = {};
+        const key1 = "key";
+
+        const waitForEnoughMicrotasks = async () => {
+            for (let i = 0; i < 10; i++)
+                await Promise.resolve();
+        };
+
+        const lock1 = await acquireLock(scope1, key1);
+
+        const lockWithError2 = withLock(scope1, key1, async () => {
+            throw new Error("some error");
+        });
+
+        let lockReleased = false;
+        void (async () => {
+            await waitForLockRelease(scope1, key1);
+            lockReleased = true;
+        })();
+
+        const lock3Promise = acquireLock(scope1, key1);
+
+        expect(lockReleased).toBe(false);
+        await waitForEnoughMicrotasks();
+        expect(lockReleased).toBe(false);
+
+        lock1.dispose();
+        expect(lockReleased).toBe(false);
+        await waitForEnoughMicrotasks();
+        expect(lockReleased).toBe(false);
+
+        try {
+            await lockWithError2;
+            expect.unreachable("lockWithError2 should throw");
+        } catch (err) {
+            expect(lockReleased).toBe(false);
+            await waitForEnoughMicrotasks();
+            expect(lockReleased).toBe(false);
+        }
+
+        const lock2 = await lock3Promise;
+        expect(lockReleased).toBe(false);
+        await waitForEnoughMicrotasks();
+        expect(lockReleased).toBe(false);
+
+        lock2.dispose();
+
+        await waitForEnoughMicrotasks();
+        expect(lockReleased).toBe(true);
     });
 });
