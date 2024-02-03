@@ -77,6 +77,18 @@ console.log("lock acquired");
 activeLock.dispose();
 ```
 
+### `waitForLockRelease`
+Wait for a lock to be released for a given `scope` and `key`.
+
+```typescript
+import {waitForLockRelease} from "lifecycle-utils";
+
+const scope = {}; // can be a reference to any object you like
+
+await waitForLockRelease(scope, "myKey");
+console.log("lock is released");
+```
+
 ### `EventRelay`
 A simple event relay.
 

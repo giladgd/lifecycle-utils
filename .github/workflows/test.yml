@@ -26,7 +26,7 @@ jobs:
           node-version: "18"
       - name: Install modules
         run: npm ci
-      - name: Run vite tests
+      - name: Run vitest tests
         run: npm run test:vitest -- --coverage --reporter=junit
       - name: Upload coverage
         uses: codecov/codecov-action@v2
