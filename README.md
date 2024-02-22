@@ -25,13 +25,13 @@ Calling `withLock` with the same `scope` and `key` will ensure that the callback
 ```typescript
 import {withLock} from "lifecycle-utils";
 
-const scope = {}; // can be a reference to any object you like
+const scope = {name: 'Tommy'}; // can be a reference to any object you like
 const startTime = Date.now();
 
 async function doSomething(index: number): number {
-    return await withLock(scope, "myKey", async () => {
+    return await withLock(scope, "myKey", async function () {
         await new Promise(resolve => setTimeout(resolve, 1000));
-        console.log("index:", index, "time:", Date.now() - startTime);
+        console.log("index:", index, "time:", Date.now() - startTime, "name:", this.name);
         return 42;
     });
 }
