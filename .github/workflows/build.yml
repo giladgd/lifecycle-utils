@@ -11,8 +11,8 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "20"
       - name: Install modules
@@ -20,7 +20,7 @@ jobs:
       - name: Build
         run: npm run build
       - name: Upload build artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: "build"
           path: "dist"
@@ -42,15 +42,15 @@ jobs:
     needs:
       - build
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           lfs: true
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
           node-version: "20"
       - name: Install modules
         run: npm ci
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           path: artifacts
       - name: Move artifacts
@@ -76,12 +76,12 @@ jobs:
           npm run docs:build
       - name: Upload docs to GitHub Pages
         if: steps.set-npm-url.outputs.npm-url != '' && github.ref == 'refs/heads/master'
-        uses: actions/upload-pages-artifact@v2
+        uses: actions/upload-pages-artifact@v4
         with:
           name: pages-docs
           path: docs-site
       - name: Deploy docs to GitHub Pages
         if: steps.set-npm-url.outputs.npm-url != '' && github.ref == 'refs/heads/master'
-        uses: actions/deploy-pages@v2
+        uses: actions/deploy-pages@v4
         with:
           artifact_name: pages-docs
