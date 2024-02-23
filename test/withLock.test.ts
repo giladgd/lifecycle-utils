@@ -300,6 +300,18 @@ describe("withLock", () => {
             // do nothing
         }
     });
+
+    test("this scope works", async () => {
+        const scope = {data: 1};
+        const key = "key";
+
+        let calls = 0;
+        await withLock(scope, key, async function (){
+            expect(this).toBe(scope);
+            calls++;
+        });
+        expect(calls).toBe(1);
+    });
 });
 
 

@@ -3,14 +3,16 @@ const locks = new Map<any, Map<string, Promise<any>>>();
 /**
  * Only allow one instance of the callback to run at a time for a given `scope` and `key`.
  */
-export async function withLock<ReturnType>(scope: any, key: string, callback: () => Promise<ReturnType>): Promise<ReturnType>;
-export async function withLock<ReturnType>(
-    scope: any, key: string, acquireLockSignal: AbortSignal | undefined, callback: () => Promise<ReturnType>
+export async function withLock<ReturnType, const ScopeType = any>(
+    scope: ScopeType, key: string, callback: (this: ScopeType) => Promise<ReturnType>
 ): Promise<ReturnType>;
-export async function withLock<ReturnType>(
-    scope: any,
+export async function withLock<ReturnType, const ScopeType = any>(
+    scope: ScopeType, key: string, acquireLockSignal: AbortSignal | undefined, callback: (this: ScopeType) => Promise<ReturnType>
+): Promise<ReturnType>;
+export async function withLock<ReturnType, const ScopeType = any>(
+    scope: ScopeType,
     key: string,
-    acquireLockSignalOrCallback: AbortSignal | undefined | (() => Promise<ReturnType>),
+    acquireLockSignalOrCallback: AbortSignal | undefined | ((this: ScopeType) => Promise<ReturnType>),
     callback?: () => Promise<ReturnType>
 ): Promise<ReturnType> {
     let acquireLockSignal: AbortSignal | undefined = undefined;
@@ -47,7 +49,7 @@ export async function withLock<ReturnType>(
             throw acquireLockSignal.reason;
     }
 
-    const promise = callback();
+    const promise = callback.call(scope);
 
     if (!locks.has(scope))
         locks.set(scope, new Map());

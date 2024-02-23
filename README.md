@@ -49,6 +49,22 @@ const res = await Promise.all([
 console.log(res); // [42, 42, 42]
 ```
 
+
+The given `scope` is used as the callback's `this`, so you can use its value in a `function`:
+
+```typescript
+import {withLock} from "lifecycle-utils";
+
+const scope = {userName: "Joe"}; // can be a reference to any object you like
+
+const res = await withLock(scope, "myKey", async function () {
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    return `Hello ${this.userName}`;
+});
+
+console.log(res); // Hello Joe
+```
+
 ### `isLockActive`
 Check whether a lock is currently active for the given `scope` and `key`.
 
