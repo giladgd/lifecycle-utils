@@ -297,7 +297,7 @@ To contribute to `lifecycle-utils` see [CONTRIBUTING.md](https://github.com/gila
 <br />
 
 <div align="center" width="360">
-    <img alt="Star please" src="https://media.githubusercontent.com/media/giladgd/lifecycle-utils/master/assets/star.please.roundEdges.png" width="360" margin="auto" />
+    <img alt="Star please" src="https://raw.githubusercontent.com/giladgd/lifecycle-utils/master/assets/star.please.roundEdges.png" width="360" margin="auto" />
     <br/>
     <p align="right">
         <i>If you like this repo, star it ✨</i>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
