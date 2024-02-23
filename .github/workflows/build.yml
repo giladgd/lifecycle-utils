@@ -76,7 +76,7 @@ jobs:
           npm run docs:build
       - name: Upload docs to GitHub Pages
         if: steps.set-npm-url.outputs.npm-url != '' && github.ref == 'refs/heads/master'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-pages-artifact@v3
         with:
           name: pages-docs
           path: docs-site
