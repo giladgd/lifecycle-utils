@@ -29,7 +29,7 @@ const scope = {}; // can be a reference to any object you like
 const startTime = Date.now();
 
 async function doSomething(index: number): number {
-    return await withLock(scope, "myKey", async function () {
+    return await withLock(scope, "myKey", async () => {
         await new Promise(resolve => setTimeout(resolve, 1000));
         console.log("index:", index, "time:", Date.now() - startTime);
         return 42;
@@ -49,17 +49,20 @@ const res = await Promise.all([
 console.log(res); // [42, 42, 42]
 ```
 
-You can use the `scope` as `this` in the callback, it will also understand the `this` type if you use TypeScript.
+
+The given `scope` is used as the callback's `this`, so you can use its value in a `function`:
 
 ```typescript
 import {withLock} from "lifecycle-utils";
-const scope = {name: 'Tommy'}; // can be a reference to any object you like
 
-const res = await withLock(scope, "lock", async function () {
+const scope = {userName: "Joe"}; // can be a reference to any object you like
+
+const res = await withLock(scope, "myKey", async function () {
     await new Promise(resolve => setTimeout(resolve, 1000));
-    return `hello ${this.name}!`;
+    return `Hello ${this.userName}`;
 });
-console.log(res); // hello Tommy!
+
+console.log(res); // Hello Joe
 ```
 
 ### `isLockActive`
