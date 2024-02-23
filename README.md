@@ -42,9 +42,9 @@ const res = await Promise.all([
     doSomething(3)
 ]);
 
-// index: 1 time: 1000
-// index: 2 time: 2000
-// index: 3 time: 3000
+// index: 1 time: 1000, name: Tommy
+// index: 2 time: 2000, name: Tommy
+// index: 3 time: 3000, name: Tommy
 
 console.log(res); // [42, 42, 42]
 ```
