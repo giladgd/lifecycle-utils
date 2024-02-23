@@ -3,11 +3,11 @@ const locks = new Map<any, Map<string, Promise<any>>>();
 /**
  * Only allow one instance of the callback to run at a time for a given `scope` and `key`.
  */
-export async function withLock<ReturnType, ScopeType>(scope: ScopeType, key: string, callback: (this: ScopeType) => Promise<ReturnType>): Promise<ReturnType>;
-export async function withLock<ReturnType, ScopeType>(
+export async function withLock<ReturnType, const ScopeType = any>(scope: ScopeType, key: string, callback: (this: ScopeType) => Promise<ReturnType>): Promise<ReturnType>;
+export async function withLock<ReturnType, const ScopeType = any>(
     scope: ScopeType, key: string, acquireLockSignal: AbortSignal | undefined, callback: (this: ScopeType) => Promise<ReturnType>
 ): Promise<ReturnType>;
-export async function withLock<ReturnType, ScopeType>(
+export async function withLock<ReturnType, const ScopeType = any>(
     scope: ScopeType,
     key: string,
     acquireLockSignalOrCallback: AbortSignal | undefined | ((this: ScopeType) => Promise<ReturnType>),
