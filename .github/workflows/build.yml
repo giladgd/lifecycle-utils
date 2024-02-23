@@ -1,7 +1,11 @@
 name: Build
 on:
   push:
-
+    branches:
+      - master
+  pull_request:
+    branches-ignore:
+      - master
   workflow_dispatch:
 
 jobs:
