@@ -25,13 +25,13 @@ Calling `withLock` with the same `scope` and `key` will ensure that the callback
 ```typescript
 import {withLock} from "lifecycle-utils";
 
-const scope = {name: 'Tommy'}; // can be a reference to any object you like
+const scope = {}; // can be a reference to any object you like
 const startTime = Date.now();
 
 async function doSomething(index: number): number {
     return await withLock(scope, "myKey", async function () {
         await new Promise(resolve => setTimeout(resolve, 1000));
-        console.log("index:", index, "time:", Date.now() - startTime, "name:", this.name);
+        console.log("index:", index, "time:", Date.now() - startTime);
         return 42;
     });
 }
@@ -42,11 +42,24 @@ const res = await Promise.all([
     doSomething(3)
 ]);
 
-// index: 1 time: 1000, name: Tommy
-// index: 2 time: 2000, name: Tommy
-// index: 3 time: 3000, name: Tommy
+// index: 1 time: 1000
+// index: 2 time: 2000
+// index: 3 time: 3000
 
 console.log(res); // [42, 42, 42]
+```
+
+You can use the `scope` as `this` in the callback, it will also understand the `this` type if you use TypeScript.
+
+```typescript
+import {withLock} from "lifecycle-utils";
+const scope = {name: 'Tommy'}; // can be a reference to any object you like
+
+const res = await withLock(scope, "lock", async function () {
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    return `hello ${this.name}!`;
+});
+console.log(res); // hello Tommy!
 ```
 
 ### `isLockActive`
