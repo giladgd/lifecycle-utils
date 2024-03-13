@@ -162,11 +162,9 @@ console.log(eventRelay2.disposed === true); // true
 
 ### `AsyncDisposeAggregator`
 `AsyncDisposeAggregator` is a utility class that allows you to add multiple items and then dispose them all at once.
-
 The items are disposed one by one in the order they were added.
 
 You can add a function to call, an object with a `dispose` method, an object with a `Symbol.dispose` method,
-
 an object with a `Symbol.asyncDispose` method, or a Promise that resolves to one of the previous types.
 
 To dispose all the items, call `dispose` or use the `Symbol.asyncDispose` symbol.
