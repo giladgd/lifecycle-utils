@@ -30,6 +30,8 @@ describe("DisposeAggregator", () => {
         expect(symbolStub.disposed).toBe(true);
         expect(functionDisposeCalled).toBe(true);
         expect(stub2.disposed).toBe(false);
+
+        disposeAggregator.dispose(); // shouldn't throw
     });
 
     test("WeakRef, Symbol.dispose", () => {

@@ -41,6 +41,8 @@ describe("AsyncDisposeAggregator", () => {
         expect(functionDisposeCalled).toBe(true);
         expect(stub2.disposed).toBe(true);
         expect(stub3.disposed).toBe(false);
+
+        await disposeAggregator.dispose(); // shouldn't throw
     });
 
     test("WeakRef, Symbol.asyncDispose", async () => {

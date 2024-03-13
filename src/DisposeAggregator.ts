@@ -44,7 +44,8 @@ export class DisposeAggregator {
      * Disposes all the targets that have been added and clears the list of targets.
      */
     public dispose(): void {
-        this._ensureNotDisposed();
+        if (this._disposed)
+            return;
 
         while (this._targets.length > 0) {
             let disposeTarget = this._targets.shift();

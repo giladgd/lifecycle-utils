@@ -50,7 +50,9 @@ export class AsyncDisposeAggregator {
      * Disposes all the targets that have been added and clears the list of targets.
      */
     public async dispose(): Promise<void> {
-        this._ensureNotDisposed();
+        if (this._disposed)
+            return;
+
         this._disposed = true;
 
         while (this._targets.length > 0) {
