@@ -7,9 +7,65 @@ describe("splitText", () => {
 
         expect(res).toEqual([
             "Hello ",
-            new Separator("<and>"),
+            Separator._create("<and>"),
             " world ",
-            new Separator("[then]"),
+            Separator._create("[then]"),
+            " !"
+        ]);
+    });
+
+    test("splitting text prioritizes first match", () => {
+        const res1 = splitText("Hello <and> world [then] !", ["<and>", "<and> worl", "[then]"]);
+        expect(res1).toEqual([
+            "Hello ",
+            Separator._create("<and>"),
+            " world ",
+            Separator._create("[then]"),
+            " !"
+        ]);
+
+        const res2 = splitText("Hello <and> world [then] !", ["<and> worl", "<and>", "[then]"]);
+        expect(res2).toEqual([
+            "Hello ",
+            Separator._create("<and> worl"),
+            "d ",
+            Separator._create("[then]"),
+            " !"
+        ]);
+
+        const res3 = splitText("Hello <and> world [then] !", ["<and>", "llo <and>", "[then]"]);
+        expect(res3).toEqual([
+            "Hello ",
+            Separator._create("<and>"),
+            " world ",
+            Separator._create("[then]"),
+            " !"
+        ]);
+
+        const res4 = splitText("Hello <and> world [then] !", ["llo <and>", "<and>", "[then]"]);
+        expect(res4).toEqual([
+            "He",
+            Separator._create("llo <and>"),
+            " world ",
+            Separator._create("[then]"),
+            " !"
+        ]);
+
+        const res5 = splitText("Hello <and> world [then] !", ["llo <and> w", "<and>", "[then]"]);
+        expect(res5).toEqual([
+            "He",
+            Separator._create("llo <and> w"),
+            "orld ",
+            Separator._create("[then]"),
+            " !"
+        ]);
+
+        const res6 = splitText("Hello <and> world [then] !", ["<and>", "llo <and> w", "[then]"]);
+        expect(res6).toEqual([
+            "Hello ",
+            Separator._create("<and>"),
+            " world ",
+            Separator._create("[then]"),
             " !"
         ]);
     });
