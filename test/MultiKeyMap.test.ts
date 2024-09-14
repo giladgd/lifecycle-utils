@@ -10,7 +10,9 @@ describe("MultiKeyMap", () => {
         map.set(["rootA", "null"], null);
         map.set(["rootB", "undefined"], undefined);
         map.set(["rootA", "num"], 4);
-        map.set(["rootA", "num2"], 8);
+
+        const key1 = ["rootA", "num2"] as const;
+        map.set(key1, 8);
 
         const map2 = new MultiKeyMap(map);
 

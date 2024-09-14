@@ -5,7 +5,7 @@ const valueSymbol = Symbol();
  */
 export class MultiKeyMap<const Key extends readonly any[], const V> {
     /** @internal */ public readonly _map: InternalMap<Key> = new Map();
-    /** @internal */ public readonly _keys = new Map<Key, V>();
+    /** @internal */ private readonly _keys = new Map<Key, V>();
 
     public constructor(entries?: readonly (readonly [key: Key, value: V])[] | MultiKeyMap<Key, V> | null) {
         if (entries != null) {
@@ -19,7 +19,7 @@ export class MultiKeyMap<const Key extends readonly any[], const V> {
      *
      * Time complexity: O(1), given that the length of the key is constant.
      */
-    public set(key: Key, value: V): this {
+    public set(key: Readonly<Key>, value: V): this {
         let map: InternalMap<Key> = this._map;
 
         for (let i = 0; i < key.length; i++) {
@@ -48,7 +48,7 @@ export class MultiKeyMap<const Key extends readonly any[], const V> {
      *
      * Time complexity: O(1), given that the length of the key is constant.
      */
-    public get(key: Key): V | undefined {
+    public get(key: Readonly<Key>): V | undefined {
         let map: InternalMap<Key> | undefined = this._map;
 
         for (let i = 0; i < key.length && map != null; i++)
@@ -69,7 +69,7 @@ export class MultiKeyMap<const Key extends readonly any[], const V> {
      *
      * Time complexity: O(1), given that the length of the key is constant.
      */
-    public has(key: Key): boolean {
+    public has(key: Readonly<Key>): boolean {
         let map: InternalMap<Key> | undefined = this._map;
 
         for (let i = 0; i < key.length && map != null; i++) {
@@ -84,7 +84,7 @@ export class MultiKeyMap<const Key extends readonly any[], const V> {
      *
      * Time complexity: O(1), given that the length of the key is constant.
      */
-    public delete(key: Key): boolean {
+    public delete(key: Readonly<Key>): boolean {
         let map: InternalMap<Key> | undefined = this._map;
         const stack: [accessMap: InternalMap<Key>, accessKey: Key[number]][] = [];
 
@@ -171,5 +171,7 @@ export class MultiKeyMap<const Key extends readonly any[], const V> {
         return this.entries();
     }
 }
+
+export type ReadonlyMultiKeyMap<Key extends readonly any[], V> = Omit<MultiKeyMap<Key, V>, "set" | "delete" | "clear">;
 
 type InternalMap<Key extends readonly any[]> = Map<Key, InternalMap<Key>> & Map<typeof valueSymbol, Key>;
