@@ -187,6 +187,31 @@ disposeAggregator.add(async () => {
 disposeAggregator.dispose();
 ```
 
+### `MultiKeyMap`
+`MultiKeyMap` is a utility class that works like a `Map`, but accepts multiple values as the key for each value.
+
+`.set(...)`, `.get(...)`, `.has(...)`, `.delete(...)` are in time complexity of O(1), given that the length of the keys is constant.
+
+```typescript
+import {MultiKeyMap} from "lifecycle-utils";
+
+type Provider = {name: string};
+const provider1: Provider = {name: "1"};
+const provider2: Provider = {name: "2"};
+
+const map = new MultiKeyMap<[provider: Provider, name: string], number>();
+
+map.set([provider1, "key1"], 1);
+map.set([provider2, "key1"], 2);
+map.set([provider1, "key2"], 3);
+
+console.log(map.get([provider1, "key1"])); // 1
+console.log(map.get([provider2, "key1"])); // 2
+console.log(map.get([provider1, "key2"])); // 3
+
+console.log([...map.keys()]); // [[{name: "1"}, "key1"], [{name: "2"}, "key1"], [{name: "1"}, "key2"]])
+```
+
 ### `LongTimeout`
 A timeout that can be set to a delay longer than the maximum timeout delay supported by a regular `setTimeout`.
 
