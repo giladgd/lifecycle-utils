@@ -4,6 +4,8 @@ export * from "./LongTimeout.js";
 export * from "./State.js";
 export * from "./DisposeAggregator.js";
 export * from "./AsyncDisposeAggregator.js";
+export * from "./DisposableHandle.js";
+export * from "./AsyncDisposableHandle.js";
 export * from "./MultiKeyMap.js";
 export * from "./splitText.js";
 export * from "./DisposedError.js";

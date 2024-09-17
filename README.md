@@ -187,6 +187,92 @@ disposeAggregator.add(async () => {
 disposeAggregator.dispose();
 ```
 
+### `DisposableHandle`
+An object that provides a `.dispose()` method that can called only once.
+
+Calling `.dispose()` will call the provided `onDispose` function only once.
+Any subsequent calls to `.dispose()` will do nothing.
+
+```typescript
+import {DisposableHandle} from "lifecycle-utils";
+
+function createHandle() {
+    console.log("allocating resources");
+    
+    return new DisposableHandle(() => {
+        console.log("resources disposed");
+    });
+}
+
+const handle = createHandle();
+handle.dispose();
+```
+
+Using the `using` feature of TypeScript is also supported:
+```typescript
+import {DisposableHandle} from "lifecycle-utils";
+
+function createHandle() {
+    console.log("allocating resources");
+    
+    return new DisposableHandle(() => {
+        console.log("resources disposed");
+    });
+}
+
+function doWork() {
+    using handle = createHandle();
+}
+
+doWork();
+// resources disposed
+// the dispose function was called since the scope of the `doWork` function ended
+```
+
+### `AsyncDisposableHandle`
+An object that provides an async `.dispose()` method that can called only once.
+
+Calling `.dispose()` will call the provided `onDispose` function only once.
+Any subsequent calls to `.dispose()` will do nothing.
+
+```typescript
+import {AsyncDisposableHandle} from "lifecycle-utils";
+
+function createHandle() {
+    console.log("allocating resources");
+    
+    return new AsyncDisposableHandle(async () => {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        console.log("resources disposed");
+    });
+}
+
+const handle = createHandle();
+await handle.dispose();
+```
+
+Using the `await using` feature of TypeScript is also supported:
+```typescript
+import {AsyncDisposableHandle} from "lifecycle-utils";
+
+function createHandle() {
+    console.log("allocating resources");
+
+    return new AsyncDisposableHandle(async () => {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        console.log("resources disposed");
+    });
+}
+
+async function doWork() {
+    await using handle = createHandle();
+}
+
+await doWork();
+// resources disposed
+// the dispose function was called since the scope of the `doWork` function ended
+```
+
 ### `MultiKeyMap`
 `MultiKeyMap` is a utility class that works like a `Map`, but accepts multiple values as the key for each value.
 
