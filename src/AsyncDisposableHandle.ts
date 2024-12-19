@@ -6,6 +6,7 @@
  */
 export class AsyncDisposableHandle {
     /** @internal */ private _onDispose: (() => Promise<void>) | undefined;
+    /** @internal */ private _disposePromise?: Promise<void>;
 
     public constructor(onDispose: () => Promise<void>) {
         this._onDispose = onDispose;
@@ -27,7 +28,10 @@ export class AsyncDisposableHandle {
             const onDispose = this._onDispose;
             delete this._onDispose;
 
-            await onDispose();
+            this._disposePromise = onDispose();
+            await this._disposePromise;
         }
+
+        await this._disposePromise;
     }
 }
