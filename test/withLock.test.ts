@@ -183,10 +183,19 @@ describe("withLock", () => {
         const lock2Controller = new AbortController();
         const lock2Promise = acquireLock(scope1, key1, lock2Controller.signal);
 
+        const lock3Controller = new AbortController();
+        const lock3Promise = acquireLock(scope1, key1, lock3Controller.signal);
+
         lock2Controller.abort(new TestError());
         await expect(lock2Promise).rejects.toBeInstanceOf(TestError);
 
         lock1.dispose();
+        await new Promise((accept) => setTimeout(accept, 0));
+
+        const lock3 = await lock3Promise;
+        expect(isLockActive(scope1, key1)).toBe(true);
+
+        lock3.dispose();
         await new Promise((accept) => setTimeout(accept, 0));
 
         expect(isLockActive(scope1, key1)).toBe(false);
