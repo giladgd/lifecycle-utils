@@ -70,32 +70,31 @@ export function isLockActive(scope: any, key: string): boolean {
 /**
  * Acquire a lock for a given `scope` and `key`.
  */
-export async function acquireLock<S = any, K extends string = string>(
+export function acquireLock<S = any, K extends string = string>(
     scope: S, key: K, acquireLockSignal?: AbortSignal
 ): Promise<Lock<S, K>> {
-    let releaseLock: (param: null) => void;
-
-    await new Promise((accept, reject) => {
-        void withLock(scope, key, acquireLockSignal, async () => {
-            accept(null);
-
-            await new Promise((accept) => {
+    return new Promise<Lock<S, K>>((accept, reject) => {
+        void withLock(scope, key, acquireLockSignal, () => {
+            let releaseLock: () => void;
+            const promise = new Promise<void>((accept) => {
                 releaseLock = accept;
             });
+
+            accept({
+                scope,
+                key,
+                dispose() {
+                    releaseLock();
+                },
+                [Symbol.dispose]() {
+                    releaseLock();
+                }
+            });
+
+            return promise;
         })
             .catch(reject);
     });
-
-    return {
-        scope,
-        key,
-        dispose() {
-            releaseLock(null);
-        },
-        [Symbol.dispose]() {
-            releaseLock(null);
-        }
-    };
 }
 
 /**
