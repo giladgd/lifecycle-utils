@@ -321,6 +321,49 @@ describe("withLock", () => {
         });
         expect(calls).toBe(1);
     });
+
+    test("async locks", async () => {
+        const scope1 = {};
+        const key1 = "key";
+
+        let proceedLock1: ((value: "something") => void) | null = null;
+        let lock1Done = false;
+        let proceedLock2: ((value: "something2") => void) | null = null;
+        let lock2Done = false;
+
+        const lockPromise1 = withLock(scope1, key1, async () => {
+            const res = new Promise((accept) => {
+                proceedLock1 = accept;
+            });
+
+            void withLock(scope1, key1, async () => {
+                const res = new Promise((accept) => {
+                    proceedLock2 = accept;
+                });
+                lock2Done = true;
+                return res;
+            });
+
+            lock1Done = true;
+            return res;
+        });
+
+        expect(lock1Done).toBe(true);
+        expect(lock2Done).toBe(false);
+
+        expect(proceedLock1).not.toBeNull();
+        proceedLock1!("something");
+
+        await expect(lockPromise1).resolves.toBe("something");
+        expect(lock2Done).toBe(true);
+
+        expect(proceedLock2).not.toBeNull();
+        proceedLock2!("something2");
+
+        await new Promise((accept) => setTimeout(accept, 0));
+
+        expect(isLockActive(scope1, key1)).toBe(false);
+    });
 });
 
 
