@@ -209,7 +209,7 @@ describe("withLock", () => {
 
         async function addRow(index: number) {
             await withLock(scope1, key1, async () => {
-                await new Promise(resolve => setTimeout(resolve, 1));
+                await new Promise((resolve) => setTimeout(resolve, 1));
                 res.push(index);
             });
         }
@@ -315,7 +315,7 @@ describe("withLock", () => {
         const key = "key";
 
         let calls = 0;
-        await withLock(scope, key, async function (){
+        await withLock(scope, key, async function () {
             expect(this).toBe(scope);
             calls++;
         });

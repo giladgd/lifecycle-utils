@@ -61,7 +61,8 @@ export class AsyncDisposeAggregator {
             if (disposeTarget instanceof Promise) {
                 try {
                     disposeTarget = await disposeTarget;
-                } catch (err) { /* c8 ignore start */
+                } catch (err) {
+                    /* c8 ignore start */
                     console.error(err);
                     continue;
                 } /* c8 ignore stop */

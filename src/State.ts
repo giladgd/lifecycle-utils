@@ -142,7 +142,7 @@ export class State<T> {
         } = {}
     ) {
         let changeEventMicrotaskQueued = false;
-        const getState = () => states.map(state => state.state) as StateTypes;
+        const getState = () => states.map((state) => state.state) as StateTypes;
         let lastDispatchState = getState();
 
         const dispatchEvent = (onlyIfChanged: boolean = true, includeLastState: boolean = true) => {
@@ -185,12 +185,12 @@ export class State<T> {
             }
         };
 
-        const handlers = states.map(state => state.createChangeListener(onChange, false));
+        const handlers = states.map((state) => state.createChangeListener(onChange, false));
 
         if (callInstantlyWithCurrentState)
             dispatchEvent(false, false);
 
-        return StateChangeListenerHandle._create(() => handlers.forEach(handler => handler.dispose()));
+        return StateChangeListenerHandle._create(() => handlers.forEach((handler) => handler.dispose()));
     }
 }
 

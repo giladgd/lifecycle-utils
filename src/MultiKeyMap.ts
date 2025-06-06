@@ -100,11 +100,11 @@ export class MultiKeyMap<const Key extends readonly any[], const V> {
         if (valueKey == null)
             return false;
 
-        map.delete(valueSymbol)
+        map.delete(valueSymbol);
         this._keys.delete(valueKey);
 
         for (let i = stack.length - 1; i >= 0; i--) {
-            const [accessMap, accessKey] = stack[i];
+            const [accessMap, accessKey] = stack[i]!;
 
             if (map.size !== 0)
                 break;

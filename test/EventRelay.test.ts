@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-expressions */
 import {describe, expect, expectTypeOf, test, vi} from "vitest";
 import {EventRelay, DisposedError} from "../src/index.js";
 
