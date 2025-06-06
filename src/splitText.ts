@@ -3,7 +3,7 @@
  * For example, `splitText("Hello <and> world [then] !", ["<and>", "[then]"])`
  *   will return `["Hello ", new Separator("<and>"), " world ", new Separator("[then]"), " !"]`
  */
-export function splitText<const S extends string[]>(text: string, separators: S): (string | Separator<S[number]>)[] {
+export function splitText<const S extends string>(text: string, separators: readonly S[]): (string | {[Sep in S]: Separator<Sep>}[S])[] {
     if (separators.length === 0)
         return [text];
 
@@ -27,8 +27,8 @@ export function splitText<const S extends string[]>(text: string, separators: S)
         let rangeToAdd: (typeof finalPartRanges[number]) | null = null;
 
         for (let j = 0; j < activeChecks.length; j++) {
-            const activeCheck = activeChecks[j];
-            const nextNode = activeCheck.currentNode.next.get(char);
+            const activeCheck = activeChecks[j]!;
+            const nextNode = activeCheck.currentNode.next.get(char!);
 
             if (nextNode == null) {
                 activeChecks.splice(j, 1);
@@ -65,7 +65,7 @@ export function splitText<const S extends string[]>(text: string, separators: S)
         }
     }
 
-    const res: (string | Separator<S[number]>)[] = [];
+    const res: (string | {[Sep in S]: Separator<Sep>}[S])[] = [];
     let lastEndIndex = 0;
 
     for (const range of finalPartRanges) {
@@ -84,8 +84,8 @@ export function splitText<const S extends string[]>(text: string, separators: S)
         if (lastEndIndex < range.textStartIndex)
             res.push(text.slice(lastEndIndex, range.textStartIndex));
 
-        res.push(Separator._create(separators[range.separatorIndex]));
-        lastEndIndex = range.textStartIndex + separators[range.separatorIndex].length;
+        res.push(Separator._create(separators[range.separatorIndex]!));
+        lastEndIndex = range.textStartIndex + separators[range.separatorIndex]!.length;
     }
 
     if (lastEndIndex < text.length)
@@ -110,15 +110,15 @@ export class Separator<S extends string> {
     }
 }
 
-function separatorsToFindTree(separators: string[]): SeparatorFindNode {
+function separatorsToFindTree(separators: readonly string[]): SeparatorFindNode {
     const root: SeparatorFindNode = {next: new Map()};
 
     for (let i = 0; i < separators.length; i++) {
-        const separator = separators[i];
+        const separator = separators[i]!;
         let node = root;
 
         for (let j = 0; j < separator.length; j++) {
-            const char = separator[j];
+            const char = separator[j]!;
 
             if (!node.next.has(char))
                 node.next.set(char, {next: new Map()});
