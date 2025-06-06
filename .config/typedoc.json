@@ -11,6 +11,6 @@
     "githubPages": true,
     "hideGenerator": true,
     "jsDocCompatibility": true,
-    "htmlLang": "en",
+    "lang": "en",
     "plugin": ["typedoc-plugin-mdn-links"]
 }
