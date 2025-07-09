@@ -7,7 +7,13 @@ export class MultiKeyMap<const Key extends readonly any[], const V> {
     /** @internal */ public readonly _map: InternalMap<Key> = new Map();
     /** @internal */ private readonly _keys = new Map<Key, V>();
 
-    public constructor(entries?: readonly (readonly [key: Key, value: V])[] | MultiKeyMap<Key, V> | null) {
+    public constructor(
+        entries?:
+            readonly (readonly [key: Key, value: V])[] |
+            MultiKeyMap<Key, V> |
+            ReadonlyMultiKeyMap<Key, V> |
+            null
+    ) {
         if (entries != null) {
             for (const [key, value] of entries)
                 this.set(key, value);

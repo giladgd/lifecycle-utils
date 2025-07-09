@@ -7,5 +7,7 @@ export * from "./AsyncDisposeAggregator.js";
 export * from "./DisposableHandle.js";
 export * from "./AsyncDisposableHandle.js";
 export * from "./MultiKeyMap.js";
+export * from "./WeakValueMultiKeyMap.js";
+export * from "./WeakValueMap.js";
 export * from "./splitText.js";
 export * from "./DisposedError.js";

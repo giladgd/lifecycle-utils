@@ -298,6 +298,62 @@ console.log(map.get([provider1, "key2"])); // 3
 console.log([...map.keys()]); // [[{name: "1"}, "key1"], [{name: "2"}, "key1"], [{name: "1"}, "key2"]])
 ```
 
+### `WeakValueMultiKeyMap`
+`WeakValueMultiKeyMap` is a utility class that works like a [`MultiKeyMap`](#multikeymap), but doesn't keep strong references to the values.
+
+When a value is garbage collected, it is automatically removed from the map.
+
+```typescript
+import {WeakValueMultiKeyMap} from "lifecycle-utils";
+
+type Provider = {name: string};
+
+const map = new WeakValueMultiKeyMap<[type: string, name: string], Provider>();
+
+{
+    const provider1: Provider = {name: "1"};
+    map.set(["type1", "key1"], provider1);
+
+    console.log(map.has(["type1", "key1"])); // true
+    console.log(map.get(["type1", "key1"])); // {name: "1"}
+    console.log(map.size); // 1
+}
+
+await new Promise(resolve => setTimeout(resolve, 1000 * 60 * 10)); // wait for the runtime to run garbage collection
+
+console.log(map.has(["type1", "key1"])); // false
+console.log(map.get(["type1", "key1"])); // undefined
+console.log(map.size); // 0
+```
+
+### `WeakValueMap`
+`WeakValueMap` is a utility class that works like a `Map`, but doesn't keep strong references to the values.
+
+When a value is garbage collected, it is automatically removed from the map.
+
+```typescript
+import {WeakValueMap} from "lifecycle-utils";
+
+type Provider = {name: string};
+
+const map = new WeakValueMap<string, Provider>();
+
+{
+    const provider1: Provider = {name: "1"};
+    map.set("provider1", provider1);
+
+    console.log(map.has("provider1")); // true
+    console.log(map.get("provider1")); // {name: "1"}
+    console.log(map.size); // 1
+}
+
+await new Promise(resolve => setTimeout(resolve, 1000 * 60 * 10)); // wait for the runtime to run garbage collection
+
+console.log(map.has("provider1")); // false
+console.log(map.get("provider1")); // undefined
+console.log(map.size); // 0
+```
+
 ### `LongTimeout`
 A timeout that can be set to a delay longer than the maximum timeout delay supported by a regular `setTimeout`.
 
