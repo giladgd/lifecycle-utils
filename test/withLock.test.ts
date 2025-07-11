@@ -1,5 +1,5 @@
 import {describe, expect, test} from "vitest";
-import {acquireLock, isLockActive, waitForLockRelease, withLock} from "../src/index.js";
+import {acquireLock, isLockActive, ValidLockScope, waitForLockRelease, withLock} from "../src/index.js";
 
 describe("withLock", () => {
     test("lock works", async () => {
@@ -8,7 +8,7 @@ describe("withLock", () => {
 
         let proceedLock1: ((value: "something") => void) | null = null;
         let lock1Done = false;
-        const lockPromise1 = withLock(scope1, key1, async () => {
+        const lockPromise1 = withLock([scope1, key1], async () => {
             const res = await new Promise((accept) => {
                 proceedLock1 = accept;
             });
@@ -18,7 +18,7 @@ describe("withLock", () => {
 
         let proceedLock2: ((value: "something2") => void) | null = null;
         let lock2Done = false;
-        const lockPromise2 = withLock(scope1, key1, async () => {
+        const lockPromise2 = withLock([scope1, key1], async () => {
             const res = await new Promise((accept) => {
                 proceedLock2 = accept;
             });
@@ -30,24 +30,24 @@ describe("withLock", () => {
         expect(proceedLock2).toBeNull();
         expect(lock1Done).toBe(false);
         expect(lock2Done).toBe(false);
-        expect(isLockActive(scope1, key1)).toBe(true);
+        expect(isLockActive([scope1, key1])).toBe(true);
 
         proceedLock1!("something");
         await expect(lockPromise1).resolves.toBe("something");
-        expect(isLockActive(scope1, key1)).toBe(true);
+        expect(isLockActive([scope1, key1])).toBe(true);
         await new Promise((accept) => setTimeout(accept, 0));
-        expect(isLockActive(scope1, key1)).toBe(true);
+        expect(isLockActive([scope1, key1])).toBe(true);
 
         expect(proceedLock2).not.toBeNull();
         expect(lock2Done).toBe(false);
 
         proceedLock2!("something2");
         await expect(lockPromise2).resolves.toBe("something2");
-        expect(isLockActive(scope1, key1)).toBe(false);
+        expect(isLockActive([scope1, key1])).toBe(false);
         await new Promise((accept) => setTimeout(accept, 0));
         expect(lock2Done).toBe(true);
 
-        expect(isLockActive(scope1, key1)).toBe(false);
+        expect(isLockActive([scope1, key1])).toBe(false);
     });
 
     test("lock works with acquireLockSignal", async () => {
@@ -63,7 +63,7 @@ describe("withLock", () => {
         let lock1Done = false;
         let lock1Error: any = undefined;
         const lock1Controller = new AbortController();
-        const lockPromise1 = withLock(scope1, key1, lock1Controller.signal, async () => {
+        const lockPromise1 = withLock([scope1, key1], lock1Controller.signal, async () => {
             const res = await new Promise((accept) => {
                 proceedLock1 = accept;
             });
@@ -78,7 +78,7 @@ describe("withLock", () => {
         let lock2Done = false;
         let lock2Error: any = undefined;
         const lock2Controller = new AbortController();
-        withLock(scope1, key1, lock2Controller.signal, async () => {
+        withLock([scope1, key1], lock2Controller.signal, async () => {
             const res = await new Promise((accept) => {
                 proceedLock2 = accept;
             });
@@ -95,7 +95,7 @@ describe("withLock", () => {
         expect(lock2Error).toBeUndefined();
         expect(lock1Done).toBe(false);
         expect(lock2Done).toBe(false);
-        expect(isLockActive(scope1, key1)).toBe(true);
+        expect(isLockActive([scope1, key1])).toBe(true);
 
         lock1Controller.abort(new TestError());
 
@@ -105,7 +105,7 @@ describe("withLock", () => {
         expect(lock2Error).toBeUndefined();
         expect(lock1Done).toBe(false);
         expect(lock2Done).toBe(false);
-        expect(isLockActive(scope1, key1)).toBe(true);
+        expect(isLockActive([scope1, key1])).toBe(true);
 
         lock2Controller.abort(new TestError());
 
@@ -115,7 +115,7 @@ describe("withLock", () => {
         expect(lock2Error).toBeUndefined();
         expect(lock1Done).toBe(false);
         expect(lock2Done).toBe(false);
-        expect(isLockActive(scope1, key1)).toBe(true);
+        expect(isLockActive([scope1, key1])).toBe(true);
 
         await waitForEnoughMicrotasks();
 
@@ -125,11 +125,11 @@ describe("withLock", () => {
         expect(lock2Error).to.be.instanceof(TestError);
         expect(lock1Done).toBe(false);
         expect(lock2Done).toBe(false);
-        expect(isLockActive(scope1, key1)).toBe(true);
+        expect(isLockActive([scope1, key1])).toBe(true);
 
         proceedLock1!("something");
         await expect(lockPromise1).resolves.toBe("something");
-        expect(isLockActive(scope1, key1)).toBe(false);
+        expect(isLockActive([scope1, key1])).toBe(false);
         expect(proceedLock2).toBeNull();
         expect(lock2Done).toBe(false);
     });
@@ -138,12 +138,12 @@ describe("withLock", () => {
         const scope1 = {};
         const key1 = "key";
 
-        const lock1 = await acquireLock(scope1, key1);
-        expect(isLockActive(scope1, key1)).toBe(true);
+        const lock1 = await acquireLock([scope1, key1]);
+        expect(isLockActive([scope1, key1])).toBe(true);
 
         let acquiredLock2 = false;
         const lock2Promise = (async () => {
-            const res = await acquireLock(scope1, key1);
+            const res = await acquireLock([scope1, key1]);
             acquiredLock2 = true;
             return res;
         })();
@@ -156,14 +156,14 @@ describe("withLock", () => {
         lock1.dispose();
         await new Promise((accept) => setTimeout(accept, 0));
 
-        expect(isLockActive(scope1, key1)).toBe(true);
+        expect(isLockActive([scope1, key1])).toBe(true);
         expect(acquiredLock2).toBe(true);
 
         const lock2 = await lock2Promise;
         lock2[Symbol.dispose]();
         await new Promise((accept) => setTimeout(accept, 0));
 
-        expect(isLockActive(scope1, key1)).toBe(false);
+        expect(isLockActive([scope1, key1])).toBe(false);
     });
 
     test("acquireLock with acquireLockSignal", async () => {
@@ -171,20 +171,20 @@ describe("withLock", () => {
         const key1 = "key";
 
         const lock1Controller = new AbortController();
-        const lock1Promise = acquireLock(scope1, key1, lock1Controller.signal);
-        expect(isLockActive(scope1, key1)).toBe(true);
+        const lock1Promise = acquireLock([scope1, key1], lock1Controller.signal);
+        expect(isLockActive([scope1, key1])).toBe(true);
 
         lock1Controller.abort(new TestError());
-        expect(isLockActive(scope1, key1)).toBe(true);
+        expect(isLockActive([scope1, key1])).toBe(true);
 
         const lock1 = await lock1Promise;
-        expect(isLockActive(scope1, key1)).toBe(true);
+        expect(isLockActive([scope1, key1])).toBe(true);
 
         const lock2Controller = new AbortController();
-        const lock2Promise = acquireLock(scope1, key1, lock2Controller.signal);
+        const lock2Promise = acquireLock([scope1, key1], lock2Controller.signal);
 
         const lock3Controller = new AbortController();
-        const lock3Promise = acquireLock(scope1, key1, lock3Controller.signal);
+        const lock3Promise = acquireLock([scope1, key1], lock3Controller.signal);
 
         lock2Controller.abort(new TestError());
         await expect(lock2Promise).rejects.toBeInstanceOf(TestError);
@@ -193,12 +193,12 @@ describe("withLock", () => {
         await new Promise((accept) => setTimeout(accept, 0));
 
         const lock3 = await lock3Promise;
-        expect(isLockActive(scope1, key1)).toBe(true);
+        expect(isLockActive([scope1, key1])).toBe(true);
 
         lock3.dispose();
         await new Promise((accept) => setTimeout(accept, 0));
 
-        expect(isLockActive(scope1, key1)).toBe(false);
+        expect(isLockActive([scope1, key1])).toBe(false);
     });
 
     test("call order", async () => {
@@ -208,7 +208,7 @@ describe("withLock", () => {
         const res: number[] = [];
 
         async function addRow(index: number) {
-            await withLock(scope1, key1, async () => {
+            await withLock([scope1, key1], async () => {
                 await new Promise((resolve) => setTimeout(resolve, 1));
                 res.push(index);
             });
@@ -232,19 +232,19 @@ describe("withLock", () => {
                 await Promise.resolve();
         };
 
-        const lock1 = await acquireLock(scope1, key1);
+        const lock1 = await acquireLock([scope1, key1]);
 
-        const lockWithError2 = withLock(scope1, key1, async () => {
+        const lockWithError2 = withLock([scope1, key1], async () => {
             throw new Error("some error");
         });
 
         let lockReleased = false;
         void (async () => {
-            await waitForLockRelease(scope1, key1);
+            await waitForLockRelease([scope1, key1]);
             lockReleased = true;
         })();
 
-        const lock3Promise = acquireLock(scope1, key1);
+        const lock3Promise = acquireLock([scope1, key1]);
 
         expect(lockReleased).toBe(false);
         await waitForEnoughMicrotasks();
@@ -279,9 +279,9 @@ describe("withLock", () => {
         const scope1 = {};
         const key1 = "key";
 
-        const lock1 = await acquireLock(scope1, key1);
+        const lock1 = await acquireLock([scope1, key1]);
 
-        const lockWithError2 = withLock(scope1, key1, async () => {
+        const lockWithError2 = withLock([scope1, key1], async () => {
             throw new Error("some error");
         });
 
@@ -289,7 +289,7 @@ describe("withLock", () => {
 
         let lockReleased = false;
         const lockReleasePromise = (async () => {
-            await waitForLockRelease(scope1, key1, lockReleasedSignal.signal);
+            await waitForLockRelease([scope1, key1], lockReleasedSignal.signal);
             lockReleased = true;
         })();
 
@@ -310,18 +310,6 @@ describe("withLock", () => {
         }
     });
 
-    test("this scope works", async () => {
-        const scope = {data: 1};
-        const key = "key";
-
-        let calls = 0;
-        await withLock(scope, key, async function () {
-            expect(this).toBe(scope);
-            calls++;
-        });
-        expect(calls).toBe(1);
-    });
-
     test("async locks", async () => {
         const scope1 = {};
         const key1 = "key";
@@ -331,12 +319,12 @@ describe("withLock", () => {
         let proceedLock2: ((value: "something2") => void) | null = null;
         let lock2Done = false;
 
-        const lockPromise1 = withLock(scope1, key1, async () => {
+        const lockPromise1 = withLock([scope1, key1], async () => {
             const res = new Promise((accept) => {
                 proceedLock1 = accept;
             });
 
-            void withLock(scope1, key1, async () => {
+            void withLock([scope1, key1], async () => {
                 const res = new Promise((accept) => {
                     proceedLock2 = accept;
                 });
@@ -362,7 +350,33 @@ describe("withLock", () => {
 
         await new Promise((accept) => setTimeout(accept, 0));
 
-        expect(isLockActive(scope1, key1)).toBe(false);
+        expect(isLockActive([scope1, key1])).toBe(false);
+    });
+
+    test("scope types", () => {
+        const obj = {};
+        const obj2 = {a: 1, b: 2};
+        const date = new Date();
+        const arr: string[] = [];
+        const func = () => void 0;
+
+        // valid scopes
+        isLockActive([1, obj, 2, 3]);
+        isLockActive([obj, 1, 2, 3]);
+        isLockActive([1, 2, 3, obj]);
+        isLockActive([1, 2, 3, func]);
+        isLockActive([date, "a", true]);
+        isLockActive([arr]);
+        isLockActive([1, 2, obj2, 3]);
+
+        // invalid scopes
+        void (checkScopeType([1, 2, 3]) satisfies InvalidLockType);
+        void (checkScopeType([1, true, null]) satisfies InvalidLockType);
+        void (checkScopeType([]) satisfies InvalidLockType);
+
+        // isLockActive([1, 2, 3]);
+        // isLockActive([1, true, null]);
+        // isLockActive([]);
     });
 });
 
@@ -370,3 +384,10 @@ describe("withLock", () => {
 class TestError extends Error {
 
 }
+
+
+export function checkScopeType<const Scope extends any[]>(scope: Scope): ValidLockScope<Scope> {
+    return scope as ValidLockScope<Scope>;
+}
+
+type InvalidLockType = ValidLockScope<[]>;

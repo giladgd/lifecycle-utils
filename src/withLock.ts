@@ -1,19 +1,23 @@
-const locks = new Map<any, Map<string, [queue: (() => void)[], onDelete: (() => void)[]]>>();
+import {MultiKeyMap} from "./MultiKeyMap.js";
+
+const locks = new MultiKeyMap<any[], [queue: (() => void)[], onDelete: (() => void)[]]>();
 
 /**
- * Only allow one instance of the callback to run at a time for a given `scope` and `key`.
+ * Only allow one instance of the callback to run at a time for a given `scope` values.
  */
-export async function withLock<ReturnType, const ScopeType = any>(
-    scope: ScopeType, key: string, callback: (this: ScopeType) => Promise<ReturnType>
+export async function withLock<ReturnType, const Scope extends any[]>(
+    scope: ValidLockScope<Scope>,
+    callback: () => Promise<ReturnType> | ReturnType
 ): Promise<ReturnType>;
-export async function withLock<ReturnType, const ScopeType = any>(
-    scope: ScopeType, key: string, acquireLockSignal: AbortSignal | undefined, callback: (this: ScopeType) => Promise<ReturnType>
+export async function withLock<ReturnType, const Scope extends any[]>(
+    scope: ValidLockScope<Scope>,
+    acquireLockSignal: AbortSignal | undefined,
+    callback: () => Promise<ReturnType> | ReturnType
 ): Promise<ReturnType>;
-export async function withLock<ReturnType, const ScopeType = any>(
-    scope: ScopeType,
-    key: string,
-    acquireLockSignalOrCallback: AbortSignal | undefined | ((this: ScopeType) => Promise<ReturnType>),
-    callback?: () => Promise<ReturnType>
+export async function withLock<ReturnType, const Scope extends any[]>(
+    scope: ValidLockScope<Scope>,
+    acquireLockSignalOrCallback: AbortSignal | undefined | (() => Promise<ReturnType> | ReturnType),
+    callback?: () => Promise<ReturnType> | ReturnType
 ): Promise<ReturnType> {
     let acquireLockSignal: AbortSignal | undefined = undefined;
 
@@ -28,31 +32,24 @@ export async function withLock<ReturnType, const ScopeType = any>(
     if (acquireLockSignal?.aborted)
         throw acquireLockSignal.reason;
 
-    let keyMap = locks.get(scope);
-    if (keyMap == null) {
-        keyMap = new Map();
-        locks.set(scope, keyMap);
-    }
+    const scopeClone = scope.slice();
 
-    let [queue, onDelete] = keyMap.get(key) || [];
+    let [queue, onDelete] = locks.get(scopeClone) || [];
     if (queue != null && onDelete != null)
         await createQueuePromise(queue, acquireLockSignal);
     else {
         queue = [];
         onDelete = [];
-        keyMap.set(key, [queue, onDelete]);
+        locks.set(scopeClone, [queue, onDelete]);
     }
 
     try {
-        return await callback.call(scope);
+        return await callback();
     } finally {
         if (queue.length > 0)
             queue.shift()!();
         else {
-            locks.get(scope)?.delete(key);
-
-            if (locks.get(scope)?.size === 0)
-                locks.delete(scope);
+            locks.delete(scopeClone);
 
             while (onDelete.length > 0)
                 onDelete.shift()!();
@@ -61,28 +58,29 @@ export async function withLock<ReturnType, const ScopeType = any>(
 }
 
 /**
- * Check if a lock is currently active for a given `scope` and `key`.
+ * Check if a lock is currently active for a given `scope` values.
  */
-export function isLockActive(scope: any, key: string): boolean {
-    return locks.get(scope)?.has(key) ?? false;
+export function isLockActive<const Scope extends any[]>(scope: ValidLockScope<Scope>): boolean {
+    return locks.has(scope) ?? false;
 }
 
 /**
- * Acquire a lock for a given `scope` and `key`.
+ * Acquire a lock for a given `scope` values.
  */
-export function acquireLock<S = any, K extends string = string>(
-    scope: S, key: K, acquireLockSignal?: AbortSignal
-): Promise<Lock<S, K>> {
-    return new Promise<Lock<S, K>>((accept, reject) => {
-        void withLock(scope, key, acquireLockSignal, () => {
+export function acquireLock<const Scope extends any[]>(
+    scope: ValidLockScope<Scope>, acquireLockSignal?: AbortSignal
+): Promise<Lock<Scope>> {
+    return new Promise<Lock<Scope>>((accept, reject) => {
+        const scopeClone = scope.slice() as typeof scope;
+
+        void withLock(scopeClone, acquireLockSignal, () => {
             let releaseLock: () => void;
             const promise = new Promise<void>((accept) => {
                 releaseLock = accept;
             });
 
             accept({
-                scope,
-                key,
+                scope: scopeClone as Scope,
                 dispose() {
                     releaseLock();
                 },
@@ -98,22 +96,24 @@ export function acquireLock<S = any, K extends string = string>(
 }
 
 /**
- * Wait for a lock to be released for a given `scope` and `key`.
+ * Wait for a lock to be released for a given `scope` values.
  */
-export async function waitForLockRelease(scope: any, key: string, signal?: AbortSignal): Promise<void> {
+export async function waitForLockRelease<const Scope extends any[]>(
+    scope: ValidLockScope<Scope>,
+    signal?: AbortSignal
+): Promise<void> {
     if (signal?.aborted)
         throw signal.reason;
 
-    const [queue, onDelete] = locks.get(scope)?.get(key) ?? [];
+    const [queue, onDelete] = locks.get(scope) ?? [];
     if (queue == null || onDelete == null)
         return;
 
     await createQueuePromise(onDelete, signal);
 }
 
-export type Lock<S = any, K extends string = string> = {
-    scope: S,
-    key: K,
+export type Lock<Scope extends any[] = any[]> = {
+    scope: Scope,
     dispose(): void,
     [Symbol.dispose](): void
 };
@@ -143,3 +143,20 @@ function createQueuePromise(queue: (() => void)[], signal?: AbortSignal) {
         signal.addEventListener("abort", onAbort);
     });
 }
+
+/**
+ * Ensure that the scope array contains at least one object, otherwise it will be `never`.
+ */
+export type ValidLockScope<T extends readonly unknown[] = unknown[]> =
+    IncludesObject<T> extends true
+        ? T & [...T]
+        : InvalidScopeError<"Scope array must include at least one object reference">;
+
+type IncludesObject<T extends readonly unknown[]> =
+    T extends [infer Head, ...infer Tail]
+        ? [Head] extends [object]
+            ? true
+            : IncludesObject<Tail>
+        : false;
+
+type InvalidScopeError<Message extends string> = unknown[] & {error: Message, __error: never};

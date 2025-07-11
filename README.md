@@ -20,7 +20,10 @@ npm install --save lifecycle-utils
 
 ## Documentation
 ### `withLock`
-Calling `withLock` with the same `scope` and `key` will ensure that the callback inside cannot run in parallel to other calls with the same `scope` and `key`.
+Calling `withLock` with the same `scope` values will ensure that the callback inside cannot run in parallel to other calls with the same `scope` values.
+
+The order of the values in the `scope` array it important, and should be consistent across calls to reference the same lock.
+You can use as many values as you like, but always ensure that at least one of them is a reference to an object.
 
 ```typescript
 import {withLock} from "lifecycle-utils";
@@ -29,7 +32,7 @@ const scope = {}; // can be a reference to any object you like
 const startTime = Date.now();
 
 async function doSomething(index: number): number {
-    return await withLock(scope, "myKey", async () => {
+    return await withLock([scope, "myKey"], async () => {
         await new Promise(resolve => setTimeout(resolve, 1000));
         console.log("index:", index, "time:", Date.now() - startTime);
         return 42;
@@ -49,43 +52,27 @@ const res = await Promise.all([
 console.log(res); // [42, 42, 42]
 ```
 
-
-The given `scope` is used as the callback's `this`, so you can use its value in a `function`:
-
-```typescript
-import {withLock} from "lifecycle-utils";
-
-const scope = {userName: "Joe"}; // can be a reference to any object you like
-
-const res = await withLock(scope, "myKey", async function () {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    return `Hello ${this.userName}`;
-});
-
-console.log(res); // Hello Joe
-```
-
 ### `isLockActive`
-Check whether a lock is currently active for the given `scope` and `key`.
+Check whether a lock is currently active for the given `scope` values.
 
 ```typescript
 import {isLockActive} from "lifecycle-utils";
 
 const scope = {}; // can be a reference to any object you like
 
-const res = isLockActive(scope, "myKey");
+const res = isLockActive([scope, "myKey"]);
 console.log(res); // false
 ```
 
 ### `acquireLock`
-Acquire a lock for the given `scope` and `key`.
+Acquire a lock for the given `scope` values.
 
 ```typescript
 import {acquireLock} from "lifecycle-utils";
 
 const scope = {}; // can be a reference to any object you like
 
-const activeLock = await acquireLock(scope, "myKey");
+const activeLock = await acquireLock([scope, "myKey"]);
 console.log("lock acquired");
 
 // ... do some work
@@ -94,14 +81,14 @@ activeLock.dispose();
 ```
 
 ### `waitForLockRelease`
-Wait for a lock to be released for a given `scope` and `key`.
+Wait for a lock to be released for a given `scope` values.
 
 ```typescript
 import {waitForLockRelease} from "lifecycle-utils";
 
 const scope = {}; // can be a reference to any object you like
 
-await waitForLockRelease(scope, "myKey");
+await waitForLockRelease([scope, "myKey"]);
 console.log("lock is released");
 ```
 
@@ -319,7 +306,8 @@ const map = new WeakValueMultiKeyMap<[type: string, name: string], Provider>();
     console.log(map.size); // 1
 }
 
-await new Promise(resolve => setTimeout(resolve, 1000 * 60 * 10)); // wait for the runtime to run garbage collection
+// wait for the runtime to run garbage collection
+await new Promise(resolve => setTimeout(resolve, 1000 * 60 * 10));
 
 console.log(map.has(["type1", "key1"])); // false
 console.log(map.get(["type1", "key1"])); // undefined
@@ -347,7 +335,8 @@ const map = new WeakValueMap<string, Provider>();
     console.log(map.size); // 1
 }
 
-await new Promise(resolve => setTimeout(resolve, 1000 * 60 * 10)); // wait for the runtime to run garbage collection
+// wait for the runtime to run garbage collection
+await new Promise(resolve => setTimeout(resolve, 1000 * 60 * 10));
 
 console.log(map.has("provider1")); // false
 console.log(map.get("provider1")); // undefined
