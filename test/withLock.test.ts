@@ -359,12 +359,18 @@ describe("withLock", () => {
         const date = new Date();
         const arr: string[] = [];
         const func = () => void 0;
+        const obj3 = new TestError();
+
+        class TestClass {}
+        const obj4 = new TestClass();
 
         // valid scopes
         isLockActive([1, obj, 2, 3]);
         isLockActive([obj, 1, 2, 3]);
         isLockActive([1, 2, 3, obj]);
         isLockActive([1, 2, 3, func]);
+        isLockActive([1, 2, 3, obj3]);
+        isLockActive([1, 2, 3, obj4]);
         isLockActive([date, "a", true]);
         isLockActive([arr]);
         isLockActive([1, 2, obj2, 3]);

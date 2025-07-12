@@ -5,16 +5,16 @@ const locks = new MultiKeyMap<any[], [queue: (() => void)[], onDelete: (() => vo
 /**
  * Only allow one instance of the callback to run at a time for a given `scope` values.
  */
-export async function withLock<ReturnType, const Scope extends any[]>(
+export async function withLock<ReturnType, const Scope extends readonly any[]>(
     scope: ValidLockScope<Scope>,
     callback: () => Promise<ReturnType> | ReturnType
 ): Promise<ReturnType>;
-export async function withLock<ReturnType, const Scope extends any[]>(
+export async function withLock<ReturnType, const Scope extends readonly any[]>(
     scope: ValidLockScope<Scope>,
     acquireLockSignal: AbortSignal | undefined,
     callback: () => Promise<ReturnType> | ReturnType
 ): Promise<ReturnType>;
-export async function withLock<ReturnType, const Scope extends any[]>(
+export async function withLock<ReturnType, const Scope extends readonly any[]>(
     scope: ValidLockScope<Scope>,
     acquireLockSignalOrCallback: AbortSignal | undefined | (() => Promise<ReturnType> | ReturnType),
     callback?: () => Promise<ReturnType> | ReturnType
@@ -60,18 +60,18 @@ export async function withLock<ReturnType, const Scope extends any[]>(
 /**
  * Check if a lock is currently active for a given `scope` values.
  */
-export function isLockActive<const Scope extends any[]>(scope: ValidLockScope<Scope>): boolean {
+export function isLockActive<const Scope extends readonly any[]>(scope: ValidLockScope<Scope>): boolean {
     return locks.has(scope) ?? false;
 }
 
 /**
  * Acquire a lock for a given `scope` values.
  */
-export function acquireLock<const Scope extends any[]>(
+export function acquireLock<const Scope extends readonly any[]>(
     scope: ValidLockScope<Scope>, acquireLockSignal?: AbortSignal
 ): Promise<Lock<Scope>> {
     return new Promise<Lock<Scope>>((accept, reject) => {
-        const scopeClone = scope.slice() as typeof scope;
+        const scopeClone = scope.slice() as any as typeof scope;
 
         void withLock(scopeClone, acquireLockSignal, () => {
             let releaseLock: () => void;
@@ -98,7 +98,7 @@ export function acquireLock<const Scope extends any[]>(
 /**
  * Wait for a lock to be released for a given `scope` values.
  */
-export async function waitForLockRelease<const Scope extends any[]>(
+export async function waitForLockRelease<const Scope extends readonly any[]>(
     scope: ValidLockScope<Scope>,
     signal?: AbortSignal
 ): Promise<void> {
@@ -112,7 +112,7 @@ export async function waitForLockRelease<const Scope extends any[]>(
     await createQueuePromise(onDelete, signal);
 }
 
-export type Lock<Scope extends any[] = any[]> = {
+export type Lock<Scope extends readonly any[] = readonly any[]> = {
     scope: Scope,
     dispose(): void,
     [Symbol.dispose](): void
@@ -147,16 +147,20 @@ function createQueuePromise(queue: (() => void)[], signal?: AbortSignal) {
 /**
  * Ensure that the scope array contains at least one object, otherwise it will be `never`.
  */
-export type ValidLockScope<T extends readonly unknown[] = unknown[]> =
+export type ValidLockScope<T extends readonly unknown[] = readonly unknown[]> =
     IncludesObject<T> extends true
-        ? T & [...T]
+        ? Readonly<T & [...T]>
         : InvalidScopeError<"Scope array must include at least one object reference">;
 
 type IncludesObject<T extends readonly unknown[]> =
-    T extends [infer Head, ...infer Tail]
-        ? [Head] extends [object]
-            ? true
-            : IncludesObject<Tail>
+    true extends (
+        {
+            [K in keyof T]: readonly [T[K]] extends readonly [object]
+                ? true
+                : false
+        }[keyof T]
+    )
+        ? true
         : false;
 
-type InvalidScopeError<Message extends string> = unknown[] & {error: Message, __error: never};
+type InvalidScopeError<Message extends string> = readonly unknown[] & {error: Message, __error: never};
