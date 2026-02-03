@@ -153,7 +153,8 @@ export default tseslint.config({
             args: "none",
             ignoreRestSiblings: true,
             varsIgnorePattern: "^set",
-            caughtErrors: "none"
+            caughtErrors: "none",
+            ignoreUsingDeclarations: true
         }],
         "@typescript-eslint/no-empty-object-type": ["off"],
         "@typescript-eslint/member-ordering": ["warn", {
