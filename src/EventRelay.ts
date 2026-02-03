@@ -88,14 +88,7 @@ export class EventRelay<T> {
 
     public clearListeners() {
         this._ensureNotDisposed();
-
-        for (const handles of Array.from(this._listenerCallbacks.values())) {
-            for (const handle of Array.from(handles)) {
-                handle.dispose();
-            }
-        }
-
-        this._listenerCallbacks.clear();
+        this._clearListeners();
     }
 
     public get listenerCount() {
@@ -107,12 +100,23 @@ export class EventRelay<T> {
     }
 
     public dispose() {
-        this.clearListeners();
+        this._clearListeners();
         this._disposed = true;
     }
 
     public [Symbol.dispose]() {
         this.dispose();
+    }
+
+    /** @internal */
+    private _clearListeners() {
+        for (const handles of Array.from(this._listenerCallbacks.values())) {
+            for (const handle of Array.from(handles)) {
+                handle.dispose();
+            }
+        }
+
+        this._listenerCallbacks.clear();
     }
 
     /** @internal */

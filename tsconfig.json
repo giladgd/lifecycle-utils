@@ -25,6 +25,7 @@
         "sourceMap": true,
         "composite": false,
         "declaration": true,
+        "declarationMap": true,
         "stripInternal": true
     },
     "files": [
