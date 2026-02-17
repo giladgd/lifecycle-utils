@@ -226,4 +226,8 @@ export class StateChangeListenerHandle {
     }
 }
 
+export type ReadonlyState<T> = Omit<State<T>, "clearChangeListeners"> & {
+    readonly state: T
+};
+
 type TypeOfState<T extends State<any>> = T extends State<infer S> ? S : never;

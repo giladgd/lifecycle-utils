@@ -23,6 +23,7 @@
         "outDir": "./dist",
         "strict": true,
         "sourceMap": true,
+        "inlineSources": true,
         "composite": false,
         "declaration": true,
         "declarationMap": true,
