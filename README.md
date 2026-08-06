@@ -22,7 +22,7 @@ npm install --save lifecycle-utils
 ### `withLock`
 Calling `withLock` with the same `scope` values will ensure that the callback inside cannot run in parallel to other calls with the same `scope` values.
 
-The order of the values in the `scope` array it important, and should be consistent across calls to reference the same lock.
+The order of the values in the `scope` array is important, and should be consistent across calls to reference the same lock.
 You can use as many values as you like, but always ensure that at least one of them is a reference to an object.
 
 ```typescript
@@ -78,6 +78,22 @@ console.log("lock acquired");
 // ... do some work
 
 activeLock.dispose();
+```
+
+Using the `using` feature of TypeScript is also supported:
+```typescript
+import {acquireLock} from "lifecycle-utils";
+
+const scope = {}; // can be a reference to any object you like
+
+{
+    using lock = await acquireLock([scope, "myKey"]);
+    console.log("lock acquired");
+    
+    // ... do some work
+}
+
+console.log("lock released");
 ```
 
 ### `waitForLockRelease`
