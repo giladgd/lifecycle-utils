@@ -49,6 +49,10 @@
   "bugs": {
     "url": "https://github.com/giladgd/lifecycle-utils/issues"
   },
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/giladgd"
+  },
   "homepage": "https://giladgd.github.io/lifecycle-utils/",
   "devDependencies": {
     "@commitlint/cli": "^19.8.1",

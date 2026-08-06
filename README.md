@@ -517,6 +517,53 @@ exiting async scope
 asyncExample done
 ```
 
+### `registerFinalizer`
+Register a finalizer for a given target, so that the finalizer is called after the target is garbage-collected.
+
+A finalizer can be a function to call, an object to dispose, or a promise that resolves to one of the previous types.
+
+```typescript
+import {DisposeAggregator, registerFinalizer} from "lifecycle-utils";
+
+const disposeAggregator = new DisposeAggregator();
+disposeAggregator.add(() => console.log("disposed"));
+
+let obj: {} | null = {};
+registerFinalizer(obj, disposeAggregator);
+
+obj = null; // get rid of a reference to the object
+await new Promise((accept) => setTimeout(accept, 1000 * 10)); // wait for the garbage collector
+
+// disposed
+```
+
+```typescript
+import {registerFinalizer} from "lifecycle-utils";
+
+let disposed1 = false;
+let disposed2 = false;
+
+let obj: {} | null = {};
+const handle1 = registerFinalizer(obj, () => {
+    disposed1 = true;
+});
+const handle2 = registerFinalizer(obj, () => {
+    disposed2 = true;
+});
+
+console.log(disposed2.finalized); // false
+
+handle1.dispose(); // remove the finalizer
+obj = null; // get rid of a reference to the object
+
+await new Promise((accept) => setTimeout(accept, 1000 * 10)); // wait for the garbage collector
+
+console.log(disposed1); // false, because we removed the finalizer
+console.log(disposed2); // true
+
+console.log(disposed2.finalized); // true
+```
+
 ## Contributing
 To contribute to `lifecycle-utils` see [CONTRIBUTING.md](https://github.com/giladgd/lifecycle-utils/blob/master/CONTRIBUTING.md).
 

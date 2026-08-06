@@ -12,3 +12,4 @@ export * from "./WeakValueMap.js";
 export * from "./splitText.js";
 export * from "./ScopeExit.js";
 export * from "./DisposedError.js";
+export * from "./registerFinalizer.js";
