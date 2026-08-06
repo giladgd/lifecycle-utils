@@ -73,6 +73,8 @@ export class AsyncDisposeAggregator {
 
             if (disposeTarget == null)
                 continue;
+            else if (disposeTarget instanceof Function)
+                await disposeTarget();
             else if (
                 Symbol.asyncDispose != null && Symbol.asyncDispose in disposeTarget &&
                 disposeTarget[Symbol.asyncDispose] instanceof Function
@@ -85,8 +87,6 @@ export class AsyncDisposeAggregator {
                 disposeTarget[Symbol.dispose]();
             else if ("dispose" in disposeTarget && disposeTarget.dispose instanceof Function)
                 await disposeTarget.dispose();
-            else if (disposeTarget instanceof Function)
-                await disposeTarget();
         }
     }
 

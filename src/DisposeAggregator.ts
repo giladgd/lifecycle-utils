@@ -55,12 +55,12 @@ export class DisposeAggregator {
 
             if (disposeTarget == null)
                 continue;
+            else if (disposeTarget instanceof Function)
+                disposeTarget();
             else if (Symbol.dispose != null && Symbol.dispose in disposeTarget && disposeTarget[Symbol.dispose] instanceof Function)
                 disposeTarget[Symbol.dispose]();
             else if ("dispose" in disposeTarget && disposeTarget.dispose instanceof Function)
                 disposeTarget.dispose();
-            else if (disposeTarget instanceof Function)
-                disposeTarget();
         }
 
         this._disposed = true;
