@@ -1,5 +1,7 @@
 import {describe, expect, test} from "vitest";
-import {acquireLock, isLockActive, ValidLockScope, waitForLockRelease, withLock} from "../src/index.js";
+import {
+    acquireLock, acquireSharedLock, isLockActive, ValidLockScope, waitForLockRelease, withLock, withSharedLock
+} from "../src/index.js";
 
 describe("withLock", () => {
     test("lock works", async () => {
@@ -384,6 +386,519 @@ describe("withLock", () => {
         // isLockActive([1, true, null]);
         // isLockActive([]);
     });
+
+    test("withLock requires a callback", async () => {
+        const scope = {};
+
+        await expect((withLock as any)([scope], undefined)).rejects.toThrow("callback is required");
+        expect(isLockActive([scope])).toBe(false);
+    });
+
+    test("withLock rejects an already aborted acquireLockSignal", async () => {
+        const scope = {};
+        const controller = new AbortController();
+        const error = new TestError();
+
+        controller.abort(error);
+
+        let callbackCalled = false;
+
+        await expect(
+            withLock([scope], controller.signal, () => {
+                callbackCalled = true;
+            })
+        ).rejects.toBe(error);
+
+        expect(callbackCalled).toBe(false);
+        expect(isLockActive([scope])).toBe(false);
+    });
+
+    test("acquireLock rejects an already aborted acquireLockSignal", async () => {
+        const scope = {};
+        const controller = new AbortController();
+        const error = new TestError();
+
+        controller.abort(error);
+
+        await expect(acquireLock([scope], controller.signal)).rejects.toBe(error);
+        expect(isLockActive([scope])).toBe(false);
+    });
+
+    test("waitForLockRelease resolves immediately when no lock is active", async () => {
+        const scope = {};
+
+        await expect(waitForLockRelease([scope])).resolves.toBeUndefined();
+    });
+
+    test("waitForLockRelease rejects an already aborted signal", async () => {
+        const scope = {};
+        const controller = new AbortController();
+        const error = new TestError();
+
+        controller.abort(error);
+
+        await expect(waitForLockRelease([scope], controller.signal)).rejects.toBe(error);
+    });
+
+    describe("shared locks", () => {
+        test("shared locks run in parallel and a regular lock waits for all of them", async () => {
+            const scope = {};
+            const key = "key";
+
+            const sharedGate1 = createGate();
+            const sharedGate2 = createGate();
+            const regularGate = createGate();
+
+            const started: string[] = [];
+
+            const shared1 = withSharedLock([scope, key], async () => {
+                started.push("shared1");
+                await sharedGate1.promise;
+                return 1;
+            });
+
+            const shared2 = withSharedLock([scope, key], async () => {
+                started.push("shared2");
+                await sharedGate2.promise;
+                return 2;
+            });
+
+            expect(started).toEqual(["shared1", "shared2"]);
+            expect(isLockActive([scope, key])).toBe(true);
+
+            const regular = withLock([scope, key], async () => {
+                started.push("regular");
+                await regularGate.promise;
+                return 3;
+            });
+
+            await flushMicrotasks();
+
+            expect(started).toEqual(["shared1", "shared2"]);
+
+            sharedGate1.release();
+            await expect(shared1).resolves.toBe(1);
+            await flushMicrotasks();
+
+            expect(started).toEqual(["shared1", "shared2"]);
+            expect(isLockActive([scope, key])).toBe(true);
+
+            sharedGate2.release();
+            await expect(shared2).resolves.toBe(2);
+            await flushMicrotasks();
+
+            expect(started).toEqual(["shared1", "shared2", "regular"]);
+            expect(isLockActive([scope, key])).toBe(true);
+
+            regularGate.release();
+            await expect(regular).resolves.toBe(3);
+
+            expect(isLockActive([scope, key])).toBe(false);
+        });
+
+        test("consecutive shared locks are grouped while preserving FIFO across regular locks", async () => {
+            const scope = {};
+            const key = "key";
+
+            const initialLock = await acquireLock([scope, key]);
+
+            const sharedGate1 = createGate();
+            const sharedGate2 = createGate();
+            const regularGate1 = createGate();
+            const sharedGate3 = createGate();
+            const sharedGate4 = createGate();
+            const regularGate2 = createGate();
+
+            const started: string[] = [];
+
+            const shared1 = withSharedLock([scope, key], async () => {
+                started.push("shared1");
+                await sharedGate1.promise;
+            });
+
+            const shared2 = withSharedLock([scope, key], async () => {
+                started.push("shared2");
+                await sharedGate2.promise;
+            });
+
+            const regular1 = withLock([scope, key], async () => {
+                started.push("regular1");
+                await regularGate1.promise;
+            });
+
+            const shared3 = withSharedLock([scope, key], async () => {
+                started.push("shared3");
+                await sharedGate3.promise;
+            });
+
+            const shared4 = withSharedLock([scope, key], async () => {
+                started.push("shared4");
+                await sharedGate4.promise;
+            });
+
+            const regular2 = withLock([scope, key], async () => {
+                started.push("regular2");
+                await regularGate2.promise;
+            });
+
+            await flushMicrotasks();
+            expect(started).toEqual([]);
+
+            initialLock.dispose();
+            await flushMicrotasks();
+
+            expect(started).toEqual(["shared1", "shared2"]);
+
+            sharedGate1.release();
+            await shared1;
+            await flushMicrotasks();
+
+            expect(started).toEqual(["shared1", "shared2"]);
+
+            sharedGate2.release();
+            await shared2;
+            await flushMicrotasks();
+
+            expect(started).toEqual(["shared1", "shared2", "regular1"]);
+
+            regularGate1.release();
+            await regular1;
+            await flushMicrotasks();
+
+            expect(started).toEqual([
+                "shared1",
+                "shared2",
+                "regular1",
+                "shared3",
+                "shared4"
+            ]);
+
+            sharedGate3.release();
+            await shared3;
+            await flushMicrotasks();
+
+            expect(started).not.toContain("regular2");
+
+            sharedGate4.release();
+            await shared4;
+            await flushMicrotasks();
+
+            expect(started).toEqual([
+                "shared1",
+                "shared2",
+                "regular1",
+                "shared3",
+                "shared4",
+                "regular2"
+            ]);
+
+            regularGate2.release();
+            await regular2;
+
+            expect(isLockActive([scope, key])).toBe(false);
+        });
+
+        test("a shared lock arriving after a queued regular lock does not bypass it", async () => {
+            const scope = {};
+
+            const activeSharedGate = createGate();
+            const regularGate = createGate();
+            const queuedSharedGate = createGate();
+
+            const started: string[] = [];
+
+            const activeShared = withSharedLock([scope], async () => {
+                started.push("shared1");
+                await activeSharedGate.promise;
+            });
+
+            const regular = withLock([scope], async () => {
+                started.push("regular");
+                await regularGate.promise;
+            });
+
+            const queuedShared = withSharedLock([scope], async () => {
+                started.push("shared2");
+                await queuedSharedGate.promise;
+            });
+
+            await flushMicrotasks();
+
+            expect(started).toEqual(["shared1"]);
+
+            activeSharedGate.release();
+            await activeShared;
+            await flushMicrotasks();
+
+            expect(started).toEqual(["shared1", "regular"]);
+
+            regularGate.release();
+            await regular;
+            await flushMicrotasks();
+
+            expect(started).toEqual(["shared1", "regular", "shared2"]);
+
+            queuedSharedGate.release();
+            await queuedShared;
+
+            expect(isLockActive([scope])).toBe(false);
+        });
+
+        test("cancelling the head regular waiter lets following shared locks join the active shared phase", async () => {
+            const scope = {};
+
+            const activeShared = await acquireSharedLock([scope]);
+
+            const regularController = new AbortController();
+            const regularError = new TestError();
+
+            const regularPromise = acquireLock([scope], regularController.signal);
+
+            const sharedGate = createGate();
+            let sharedStarted = false;
+
+            const sharedPromise = withSharedLock([scope], async () => {
+                sharedStarted = true;
+                await sharedGate.promise;
+            });
+
+            await flushMicrotasks();
+
+            expect(sharedStarted).toBe(false);
+
+            regularController.abort(regularError);
+            await expect(regularPromise).rejects.toBe(regularError);
+            await flushMicrotasks();
+
+            expect(sharedStarted).toBe(true);
+
+            sharedGate.release();
+            await sharedPromise;
+
+            expect(isLockActive([scope])).toBe(true);
+
+            activeShared.dispose();
+
+            expect(isLockActive([scope])).toBe(false);
+        });
+
+        test("queued shared lock can be aborted", async () => {
+            const scope = {};
+
+            const regularLock = await acquireLock([scope]);
+
+            const controller1 = new AbortController();
+            const controller2 = new AbortController();
+
+            let shared1Started = false;
+            let shared2Started = false;
+
+            const shared1 = withSharedLock([scope], controller1.signal, () => {
+                shared1Started = true;
+            });
+
+            const sharedGate2 = createGate();
+            const shared2 = withSharedLock([scope], controller2.signal, async () => {
+                shared2Started = true;
+                await sharedGate2.promise;
+            });
+
+            const error = new TestError();
+            controller1.abort(error);
+
+            await expect(shared1).rejects.toBe(error);
+
+            expect(shared1Started).toBe(false);
+            expect(shared2Started).toBe(false);
+
+            regularLock.dispose();
+            await flushMicrotasks();
+
+            expect(shared1Started).toBe(false);
+            expect(shared2Started).toBe(true);
+
+            /*
+             * Once acquired, the signal no longer owns the lifetime of the lock.
+             */
+            controller2.abort(new TestError());
+
+            sharedGate2.release();
+            await shared2;
+
+            expect(isLockActive([scope])).toBe(false);
+        });
+
+        test("acquireSharedLock queues and consecutive shared handles acquire together", async () => {
+            const scope = {};
+
+            const regularLock = await acquireLock([scope]);
+
+            let acquired1 = false;
+            let acquired2 = false;
+
+            const shared1Promise = acquireSharedLock([scope])
+                .then((lock) => {
+                    acquired1 = true;
+                    return lock;
+                });
+
+            const controller = new AbortController();
+
+            const shared2Promise = acquireSharedLock([scope], controller.signal)
+                .then((lock) => {
+                    acquired2 = true;
+                    return lock;
+                });
+
+            await flushMicrotasks();
+
+            expect(acquired1).toBe(false);
+            expect(acquired2).toBe(false);
+
+            regularLock.dispose();
+            await flushMicrotasks();
+
+            expect(acquired1).toBe(true);
+            expect(acquired2).toBe(true);
+
+            const shared1 = await shared1Promise;
+            const shared2 = await shared2Promise;
+
+            // Acquisition signals have no effect after acquisition.
+            controller.abort(new TestError());
+
+            let regularAcquired = false;
+            const nextRegularPromise = acquireLock([scope])
+                .then((lock) => {
+                    regularAcquired = true;
+                    return lock;
+                });
+
+            await flushMicrotasks();
+            expect(regularAcquired).toBe(false);
+
+            shared1.dispose();
+            shared1.dispose();
+
+            await flushMicrotasks();
+            expect(regularAcquired).toBe(false);
+
+            shared2[Symbol.dispose]();
+            await flushMicrotasks();
+
+            expect(regularAcquired).toBe(true);
+
+            // Disposal is idempotent.
+            shared2.dispose();
+
+            const nextRegular = await nextRegularPromise;
+            nextRegular.dispose();
+
+            expect(isLockActive([scope])).toBe(false);
+        });
+
+        test("aborted signals reject before acquiring a shared lock", async () => {
+            const scope = {};
+
+            const withLockController = new AbortController();
+            const withLockError = new TestError();
+            withLockController.abort(withLockError);
+
+            let callbackCalled = false;
+
+            await expect(
+                withSharedLock([scope], withLockController.signal, () => {
+                    callbackCalled = true;
+                })
+            ).rejects.toBe(withLockError);
+
+            expect(callbackCalled).toBe(false);
+            expect(isLockActive([scope])).toBe(false);
+
+            const acquireController = new AbortController();
+            const acquireError = new TestError();
+            acquireController.abort(acquireError);
+
+            await expect(
+                acquireSharedLock([scope], acquireController.signal)
+            ).rejects.toBe(acquireError);
+
+            expect(isLockActive([scope])).toBe(false);
+        });
+
+        test("shared callback errors release their shared usage", async () => {
+            const scope = {};
+
+            const sharedGate = createGate();
+
+            const shared1 = withSharedLock([scope], async () => {
+                await sharedGate.promise;
+            });
+
+            const error = new TestError();
+
+            const shared2 = withSharedLock([scope], () => {
+                throw error;
+            });
+
+            await expect(shared2).rejects.toBe(error);
+
+            let regularStarted = false;
+
+            const regular = withLock([scope], () => {
+                regularStarted = true;
+            });
+
+            await flushMicrotasks();
+            expect(regularStarted).toBe(false);
+
+            sharedGate.release();
+            await shared1;
+            await regular;
+
+            expect(regularStarted).toBe(true);
+            expect(isLockActive([scope])).toBe(false);
+        });
+
+        test("waitForLockRelease waits for every active shared lock", async () => {
+            const scope = {};
+
+            const shared1 = await acquireSharedLock([scope]);
+            const shared2 = await acquireSharedLock([scope]);
+
+            let released = false;
+
+            const releasedPromise = waitForLockRelease([scope])
+                .then(() => {
+                    released = true;
+                });
+
+            await flushMicrotasks();
+            expect(released).toBe(false);
+
+            shared1.dispose();
+
+            await flushMicrotasks();
+            expect(released).toBe(false);
+
+            shared2.dispose();
+
+            await releasedPromise;
+
+            expect(released).toBe(true);
+            expect(isLockActive([scope])).toBe(false);
+        });
+
+        test("withSharedLock requires a callback at runtime", async () => {
+            const scope = {};
+
+            await expect(
+                (withSharedLock as any)([scope], undefined)
+            ).rejects.toThrow("callback is required");
+
+            expect(isLockActive([scope])).toBe(false);
+        });
+    });
 });
 
 
@@ -394,6 +909,21 @@ class TestError extends Error {
 
 export function checkScopeType<const Scope extends any[]>(scope: Scope): ValidLockScope<Scope> {
     return scope as ValidLockScope<Scope>;
+}
+
+function createGate() {
+    let release!: () => void;
+
+    const promise = new Promise<void>((accept) => {
+        release = accept;
+    });
+
+    return {promise, release};
+}
+
+async function flushMicrotasks() {
+    for (let i = 0; i < 5; i++)
+        await Promise.resolve();
 }
 
 type InvalidLockType = ValidLockScope<[]>;

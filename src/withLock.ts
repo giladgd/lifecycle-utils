@@ -1,9 +1,22 @@
 import {MultiKeyMap} from "./MultiKeyMap.js";
 
-const locks = new MultiKeyMap<any[], [queue: (() => void)[], onDelete: (() => void)[]]>();
+type LockState = [
+    queue: ((() => void) | [entry: () => void])[],
+    onDelete: (() => void)[],
+    shared?: number
+];
+const enum LockIndex {
+    queue = 0,
+    onDelete = 1,
+    shared = 2
+}
+const locks = new MultiKeyMap<any[], LockState>();
 
 /**
- * Only allow one instance of the callback to run at a time for a given `scope` values.
+ * Run a callback while holding an exclusive lock for the given `scope`.
+ *
+ * An exclusive lock prevents any other exclusive or shared locks from being held at the same time.
+ * Lock requests are acquired in the order they are made; consecutive shared lock requests are acquired together.
  */
 export async function withLock<ReturnType, const Scope extends readonly any[]>(
     scope: ValidLockScope<Scope>,
@@ -34,65 +47,139 @@ export async function withLock<ReturnType, const Scope extends readonly any[]>(
 
     const scopeClone = scope.slice();
 
-    let [queue, onDelete] = locks.get(scopeClone) || [];
-    if (queue != null && onDelete != null)
-        await createQueuePromise(queue, acquireLockSignal);
+    let state = locks.get(scopeClone);
+    if (state != null)
+        await createQueuePromise(state[LockIndex.queue], acquireLockSignal, state);
     else {
-        queue = [];
-        onDelete = [];
-        locks.set(scopeClone, [queue, onDelete]);
+        state = [[], []];
+        locks.set(scopeClone, state);
     }
 
     try {
         return await callback();
     } finally {
-        if (queue.length > 0)
-            queue.shift()!();
-        else {
-            locks.delete(scopeClone);
-
-            while (onDelete.length > 0)
-                onDelete.shift()!();
-        }
+        releaseNextLock(scopeClone, state);
     }
 }
 
 /**
- * Check if a lock is currently active for a given `scope` values.
+ * Run a callback while holding a shared lock for the given `scope`.
+ *
+ * Multiple shared locks can run in parallel, while a regular lock requires exclusive access.
+ * Lock requests are acquired in the order they are made; consecutive shared lock requests acquired together.
+ * A new shared lock joins an active shared lock immediately when no regular lock requests are waiting.
+ */
+export async function withSharedLock<ReturnType, const Scope extends readonly any[]>(
+    scope: ValidLockScope<Scope>,
+    callback: () => Promise<ReturnType> | ReturnType
+): Promise<ReturnType>;
+export async function withSharedLock<ReturnType, const Scope extends readonly any[]>(
+    scope: ValidLockScope<Scope>,
+    acquireLockSignal: AbortSignal | undefined,
+    callback: () => Promise<ReturnType> | ReturnType
+): Promise<ReturnType>;
+export async function withSharedLock<ReturnType, const Scope extends readonly any[]>(
+    scope: ValidLockScope<Scope>,
+    acquireLockSignalOrCallback: AbortSignal | undefined | (() => Promise<ReturnType> | ReturnType),
+    callback?: () => Promise<ReturnType> | ReturnType
+): Promise<ReturnType> {
+    let acquireLockSignal: AbortSignal | undefined = undefined;
+
+    if (acquireLockSignalOrCallback instanceof AbortSignal)
+        acquireLockSignal = acquireLockSignalOrCallback;
+    else if (acquireLockSignalOrCallback != null)
+        callback = acquireLockSignalOrCallback;
+
+    if (callback == null)
+        throw new Error("callback is required");
+
+    if (acquireLockSignal?.aborted)
+        throw acquireLockSignal.reason;
+
+    const scopeClone = scope.slice();
+
+    let state = locks.get(scopeClone);
+
+    if (state == null) {
+        state = [[], [], 1];
+        locks.set(scopeClone, state);
+    } else {
+        const shared = state[LockIndex.shared];
+
+        if (typeof shared === "number" && state[LockIndex.queue].length === 0)
+            state[LockIndex.shared] = shared + 1;
+        else
+            await createSharedQueuePromise(state[LockIndex.queue], acquireLockSignal);
+    }
+
+    try {
+        return await callback();
+    } finally {
+        releaseSharedLock(scopeClone, state);
+    }
+}
+
+/**
+ * Check whether a lock is currently active for a given `scope` values.
  */
 export function isLockActive<const Scope extends readonly any[]>(scope: ValidLockScope<Scope>): boolean {
     return locks.has(scope) ?? false;
 }
 
 /**
- * Acquire a lock for a given `scope` values.
+ * Acquire an exclusive lock for the given `scope`.
+ *
+ * An exclusive lock prevents any other exclusive or shared locks from being held at the same time.
+ * Lock requests are acquired in the order they are made; consecutive shared lock requests are acquired together.
  */
-export function acquireLock<const Scope extends readonly any[]>(
+export async function acquireLock<const Scope extends readonly any[]>(
     scope: ValidLockScope<Scope>, acquireLockSignal?: AbortSignal
 ): Promise<Lock<Scope>> {
-    return new Promise<Lock<Scope>>((accept, reject) => {
-        const scopeClone = scope.slice() as any as typeof scope;
+    if (acquireLockSignal?.aborted)
+        throw acquireLockSignal.reason;
 
-        void withLock(scopeClone, acquireLockSignal, () => {
-            let releaseLock: () => void;
-            const promise = new Promise<void>((accept) => {
-                releaseLock = accept;
-            });
+    const scopeClone = scope.slice();
 
-            accept({
-                scope: scopeClone as Scope,
-                dispose() {
-                    releaseLock();
-                },
-                [Symbol.dispose]() {
-                    releaseLock();
-                }
-            });
+    let state = locks.get(scopeClone);
+    if (state != null)
+        await createQueuePromise(state[LockIndex.queue], acquireLockSignal, state);
+    else {
+        state = [[], []];
+        locks.set(scopeClone, state);
+    }
 
-            return promise;
-        })
-            .catch(reject);
-    });
+    return LockHandle._create<Scope>(scopeClone as any as Scope, state, false);
+}
+
+/**
+ * Acquire a shared lock for the given `scope`.
+ *
+ * Multiple shared locks can be held in parallel, while a regular lock requires exclusive access.
+ * Lock requests are acquired in the order they are made; consecutive shared lock requests acquired together.
+ * A new shared lock joins an active shared lock immediately when no regular lock requests are waiting.
+ */
+export async function acquireSharedLock<const Scope extends readonly any[]>(
+    scope: ValidLockScope<Scope>, acquireLockSignal?: AbortSignal
+): Promise<Lock<Scope>> {
+    if (acquireLockSignal?.aborted)
+        throw acquireLockSignal.reason;
+
+    const scopeClone = scope.slice();
+
+    let state = locks.get(scopeClone);
+    if (state == null) {
+        state = [[], [], 1];
+        locks.set(scopeClone, state);
+    } else {
+        const shared = state[LockIndex.shared];
+
+        if (typeof shared === "number" && state[LockIndex.queue].length === 0)
+            state[LockIndex.shared] = shared + 1;
+        else
+            await createSharedQueuePromise(state[LockIndex.queue], acquireLockSignal);
+    }
+
+    return LockHandle._create<Scope>(scopeClone as any as Scope, state, true);
 }
 
 /**
@@ -112,13 +199,98 @@ export async function waitForLockRelease<const Scope extends readonly any[]>(
     await createQueuePromise(onDelete, signal);
 }
 
+export class LockHandle<const Scope extends readonly any[]> implements Lock<Scope> {
+    public readonly scope: Scope;
+    /** @internal */ private _state: LockState | undefined;
+    /** @internal */ private readonly _shared: boolean;
+
+    private constructor(scope: Scope, state: LockState, shared: boolean) {
+        this.scope = scope;
+        this._state = state;
+        this._shared = shared;
+    }
+
+    public dispose() {
+        const state = this._state;
+        if (state == null)
+            return;
+
+        this._state = undefined;
+
+        if (this._shared)
+            releaseSharedLock(this.scope, state);
+        else
+            releaseNextLock(this.scope, state);
+    }
+
+    public [Symbol.dispose]() {
+        this.dispose();
+    }
+
+    /** @internal */
+    public static _create<const Scope extends readonly any[]>(scope: Scope, state: LockState, shared: boolean) {
+        return new LockHandle(scope, state, shared);
+    }
+}
+
 export type Lock<Scope extends readonly any[] = readonly any[]> = {
     scope: Scope,
     dispose(): void,
     [Symbol.dispose](): void
 };
 
-function createQueuePromise(queue: (() => void)[], signal?: AbortSignal) {
+function releaseNextLock(scope: readonly any[], state: LockState) {
+    const queue = state[LockIndex.queue];
+
+    if (queue.length > 0) {
+        const entry = queue[0]!;
+
+        if (typeof entry === "function") {
+            queue.shift();
+            return void entry();
+        }
+
+        return void activateSharedLocks(state);
+    }
+
+    locks.delete(scope);
+
+    const onDelete = state[LockIndex.onDelete];
+    for (let i = 0; i < onDelete.length; i++)
+        onDelete[i]!();
+
+    onDelete.length = 0;
+}
+
+function releaseSharedLock(scope: readonly any[], state: LockState) {
+    const shared = state[LockIndex.shared] as number;
+
+    if (shared > 1)
+        state[LockIndex.shared] = shared - 1;
+    else {
+        state.length = LockIndex.shared;
+        releaseNextLock(scope, state);
+    }
+}
+
+function activateSharedLocks(state: LockState) {
+    const queue = state[LockIndex.queue];
+
+    let sharedUsageCount = 0;
+    for (; sharedUsageCount < queue.length; sharedUsageCount++) {
+        const entry = queue[sharedUsageCount]!;
+
+        if (typeof entry === "function")
+            break;
+
+        entry[0]();
+    }
+
+    state[LockIndex.shared] = (state[LockIndex.shared] ?? 0) + sharedUsageCount;
+    queue.splice(0, sharedUsageCount);
+}
+
+function createQueuePromise(queue: LockState[LockIndex.queue], signal?: AbortSignal, state?: LockState) {
     if (signal == null)
         return new Promise<void>((accept) => void queue.push(accept));
 
@@ -132,6 +304,39 @@ function createQueuePromise(queue: (() => void)[], signal?: AbortSignal) {
 
         function onAbort() {
             const itemIndex = queue.lastIndexOf(onAcquireLock, queueLength);
+            if (itemIndex >= 0) {
+                queue.splice(itemIndex, 1);
+
+                if (state != null && itemIndex === 0 && state[LockIndex.shared] != null && queue.length > 0 &&
+                    typeof queue[0] !== "function"
+                )
+                    activateSharedLocks(state);
+            }
+
+            signal!.removeEventListener("abort", onAbort);
+            reject(signal!.reason);
+        }
+
+        queue.push(onAcquireLock);
+        signal.addEventListener("abort", onAbort);
+    });
+}
+
+function createSharedQueuePromise(queue: LockState[LockIndex.queue], signal?: AbortSignal) {
+    if (signal == null)
+        return new Promise<void>((accept) => void queue.push([accept]));
+
+    return new Promise<void>((accept, reject) => {
+        function onAcquireLock() {
+            signal!.removeEventListener("abort", onAbort);
+            accept();
+        }
+
+        const queueLength = queue.length;
+        const entry: [entry: () => void] = [onAcquireLock];
+
+        function onAbort() {
+            const itemIndex = queue.lastIndexOf(entry, queueLength);
             if (itemIndex >= 0)
                 queue.splice(itemIndex, 1);
 
@@ -139,7 +344,7 @@ function createQueuePromise(queue: (() => void)[], signal?: AbortSignal) {
             reject(signal!.reason);
         }
 
-        queue.push(onAcquireLock);
+        queue.push(entry);
         signal.addEventListener("abort", onAbort);
     });
 }

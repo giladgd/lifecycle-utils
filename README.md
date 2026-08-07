@@ -20,7 +20,8 @@ npm install --save lifecycle-utils
 
 ## Documentation
 ### `withLock`
-Calling `withLock` with the same `scope` values will ensure that the callback inside cannot run in parallel to other calls with the same `scope` values.
+Calling `withLock` acquires an exclusive lock for the given `scope` values,
+ensuring that its callback cannot run in parallel to any other exclusive or shared lock that use the same `scope` values.
 
 The order of the values in the `scope` array is important, and should be consistent across calls to reference the same lock.
 You can use as many values as you like, but always ensure that at least one of them is a reference to an object.
@@ -65,7 +66,7 @@ console.log(res); // false
 ```
 
 ### `acquireLock`
-Acquire a lock for the given `scope` values.
+Acquire an exclusive lock for the given `scope` values.
 
 ```typescript
 import {acquireLock} from "lifecycle-utils";
@@ -97,7 +98,7 @@ console.log("lock released");
 ```
 
 ### `waitForLockRelease`
-Wait for a lock to be released for a given `scope` values.
+Wait for all locks to be released for a given `scope` values.
 
 ```typescript
 import {waitForLockRelease} from "lifecycle-utils";
@@ -106,6 +107,92 @@ const scope = {}; // can be a reference to any object you like
 
 await waitForLockRelease([scope, "myKey"]);
 console.log("lock is released");
+```
+
+### `withSharedLock`
+Calling `withSharedLock` acquires a shared lock for the given `scope`,
+allowing multiple shared locks to run in parallel while preventing an exclusive lock from running at the same time.
+
+Lock requests are acquired in the order they are made, with consecutive shared lock requests acquired together.
+A new shared lock joins an active shared lock immediately when no regular lock requests are waiting.
+
+```typescript
+import {withLock, withSharedLock} from "lifecycle-utils";
+
+const scope = {}; // can be a reference to any object you like
+const sleep = (duration: number) => new Promise((resolve) => setTimeout(resolve, duration));
+
+const exclusive1 = withLock([scope, "myKey"], async () => {
+    console.log("exclusive 1 started");
+    await sleep(1000);
+    console.log("exclusive 1 finished");
+});
+
+const shared1 = withSharedLock([scope, "myKey"], async () => {
+    console.log("shared 1 started");
+    await sleep(1000);
+    console.log("shared 1 finished");
+});
+const shared2 = withSharedLock([scope, "myKey"], async () => {
+    console.log("shared 2 started");
+    await sleep(500);
+    console.log("shared 2 finished");
+});
+
+const exclusive2 = withLock([scope, "myKey"], async () => {
+    console.log("exclusive 2 started");
+    await sleep(1000);
+    console.log("exclusive 2 finished");
+});
+
+await Promise.all([exclusive1, shared1, shared2, exclusive2]);
+
+// exclusive 1 started
+// exclusive 1 finished
+// shared 1 started
+// shared 2 started
+// shared 2 finished
+// shared 1 finished
+// exclusive 2 started
+// exclusive 2 finished
+```
+
+### `acquireSharedLock`
+Acquire a shared lock for the given `scope` values.
+
+Multiple shared locks can be held in parallel,
+while an exclusive lock cannot be held until every shared lock is released.
+
+Lock requests are acquired in the order they are made, with consecutive shared lock requests acquired together.
+A new shared lock joins an active shared lock immediately when no regular lock requests are waiting.
+
+```typescript
+import {acquireSharedLock} from "lifecycle-utils";
+
+const scope = {}; // can be a reference to any object you like
+
+const activeLock = await acquireSharedLock([scope, "myKey"]);
+console.log("shared lock acquired");
+
+// ... do some work
+
+activeLock.dispose();
+```
+
+Using the `using` feature of TypeScript is also supported:
+```typescript
+import {acquireSharedLock} from "lifecycle-utils";
+
+const scope = {}; // can be a reference to any object you like
+
+{
+    using lock = await acquireSharedLock([scope, "myKey"]);
+    console.log("shared lock acquired");
+    
+    // ... do some work
+}
+
+console.log("lock released");
 ```
 
 ### `EventRelay`
