@@ -1,8 +1,9 @@
 import {MultiKeyMap} from "./MultiKeyMap.js";
+import {Queue} from "./Queue.js";
 
 type LockState = [
-    queue: ((() => void) | [entry: () => void])[],
-    onDelete: (() => void)[],
+    queue: Queue<(() => void) | [entry: () => void]>,
+    onDelete: Queue<() => void>,
     shared?: number
 ];
 const enum LockIndex {
@@ -51,7 +52,7 @@ export async function withLock<ReturnType, const Scope extends readonly any[]>(
     if (state != null)
         await createQueuePromise(state[LockIndex.queue], acquireLockSignal, state);
     else {
-        state = [[], []];
+        state = [new Queue(), new Queue()];
         locks.set(scopeClone, state);
     }
 
@@ -101,12 +102,12 @@ export async function withSharedLock<ReturnType, const Scope extends readonly an
     let state = locks.get(scopeClone);
 
     if (state == null) {
-        state = [[], [], 1];
+        state = [new Queue(), new Queue(), 1];
         locks.set(scopeClone, state);
     } else {
         const shared = state[LockIndex.shared];
 
-        if (typeof shared === "number" && state[LockIndex.queue].length === 0)
+        if (typeof shared === "number" && state[LockIndex.queue].isEmpty)
             state[LockIndex.shared] = shared + 1;
         else
             await createSharedQueuePromise(state[LockIndex.queue], acquireLockSignal);
@@ -144,7 +145,7 @@ export async function acquireLock<const Scope extends readonly any[]>(
     if (state != null)
         await createQueuePromise(state[LockIndex.queue], acquireLockSignal, state);
     else {
-        state = [[], []];
+        state = [new Queue(), new Queue()];
         locks.set(scopeClone, state);
     }
 
@@ -168,12 +169,12 @@ export async function acquireSharedLock<const Scope extends readonly any[]>(
 
     let state = locks.get(scopeClone);
     if (state == null) {
-        state = [[], [], 1];
+        state = [new Queue(), new Queue(), 1];
         locks.set(scopeClone, state);
     } else {
         const shared = state[LockIndex.shared];
 
-        if (typeof shared === "number" && state[LockIndex.queue].length === 0)
+        if (typeof shared === "number" && state[LockIndex.queue].isEmpty)
             state[LockIndex.shared] = shared + 1;
         else
             await createSharedQueuePromise(state[LockIndex.queue], acquireLockSignal);
@@ -242,8 +243,8 @@ export type Lock<Scope extends readonly any[] = readonly any[]> = {
 function releaseNextLock(scope: readonly any[], state: LockState) {
     const queue = state[LockIndex.queue];
 
-    if (queue.length > 0) {
-        const entry = queue[0]!;
+    if (!queue.isEmpty) {
+        const entry = queue.first;
 
         if (typeof entry === "function") {
             queue.shift();
@@ -256,10 +257,10 @@ function releaseNextLock(scope: readonly any[], state: LockState) {
     locks.delete(scope);
 
     const onDelete = state[LockIndex.onDelete];
-    for (let i = 0; i < onDelete.length; i++)
-        onDelete[i]!();
+    for (const callback of onDelete.values())
+        callback();
 
-    onDelete.length = 0;
+    onDelete.clear();
 }
 
 function releaseSharedLock(scope: readonly any[], state: LockState) {
@@ -277,17 +278,16 @@ function activateSharedLocks(state: LockState) {
     const queue = state[LockIndex.queue];
 
     let sharedUsageCount = 0;
-    for (; sharedUsageCount < queue.length; sharedUsageCount++) {
-        const entry = queue[sharedUsageCount]!;
-
+    for (const entry of queue.values()) {
         if (typeof entry === "function")
             break;
 
+        sharedUsageCount++;
         entry[0]();
     }
 
     state[LockIndex.shared] = (state[LockIndex.shared] ?? 0) + sharedUsageCount;
-    queue.splice(0, sharedUsageCount);
+    queue.delete(0, sharedUsageCount);
 }
 
 function createQueuePromise(queue: LockState[LockIndex.queue], signal?: AbortSignal, state?: LockState) {
@@ -305,10 +305,10 @@ function createQueuePromise(queue: LockState[LockIndex.queue], signal?: AbortSig
         function onAbort() {
             const itemIndex = queue.lastIndexOf(onAcquireLock, queueLength);
             if (itemIndex >= 0) {
-                queue.splice(itemIndex, 1);
+                queue.delete(itemIndex);
 
-                if (state != null && itemIndex === 0 && state[LockIndex.shared] != null && queue.length > 0 &&
-                    typeof queue[0] !== "function"
+                if (state != null && itemIndex === 0 && state[LockIndex.shared] != null && !queue.isEmpty &&
+                    typeof queue.first !== "function"
                 )
                     activateSharedLocks(state);
             }
@@ -338,7 +338,7 @@ function createSharedQueuePromise(queue: LockState[LockIndex.queue], signal?: Ab
         function onAbort() {
             const itemIndex = queue.lastIndexOf(entry, queueLength);
             if (itemIndex >= 0)
-                queue.splice(itemIndex, 1);
+                queue.delete(itemIndex);
 
             signal!.removeEventListener("abort", onAbort);
             reject(signal!.reason);
