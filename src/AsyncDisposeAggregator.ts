@@ -70,8 +70,11 @@ export class AsyncDisposeAggregator {
         else if (this._disposed !== false)
             return this._disposed;
 
-        this._disposed = Promise.resolve().then(this._dispose.bind(this));
-        return this._disposed;
+        const disposedPromise = this._dispose();
+        if (this._disposed === false)
+            this._disposed = disposedPromise;
+
+        return disposedPromise;
     }
 
     public [Symbol.asyncDispose](): Promise<void> {
