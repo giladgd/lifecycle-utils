@@ -563,6 +563,23 @@ const parts = splitText("Hello <and> world [then] !", ["<and>", "[then]"]);
 console.log(parts); // ["Hello ", new Separator("<and>"), " world ", new Separator("[then]"), " !"]
 ```
 
+### `Queue`
+An efficient queue implementation that allows you to enqueue and dequeue items in `O(1)` time complexity.
+
+```typescript
+import {Queue} from "lifecycle-utils";
+
+const queue = new Queue([1, 2, 3]);
+
+queue.push(4);
+console.log(queue.shift()); // 1
+
+console.log(queue.first); // 2
+console.log(queue.last); // 4
+console.log(queue.length); // 3
+console.log([...queue]); // [2, 3, 4]
+```
+
 ### `scopeExit`
 Create a scope exit handle that will call the provided callback when disposed, to be used with `using` or `await using`.
 
