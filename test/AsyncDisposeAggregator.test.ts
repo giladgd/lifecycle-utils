@@ -248,7 +248,7 @@ describe("AsyncDisposeAggregator", () => {
         const disposePromise = disposeAggregator.dispose();
         let disposeFinished = false;
 
-        void disposePromise.then( () => {
+        void disposePromise.then(() => {
             disposeFinished = true;
         }, () => {
             disposeFinished = true;
