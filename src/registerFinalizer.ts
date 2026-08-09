@@ -129,19 +129,19 @@ async function onFinalization([disposeTarget, token]: [disposeTarget: RegisterFi
     try {
         if (disposeTarget == null)
             return;
-        else if (disposeTarget instanceof Function)
+        else if (typeof disposeTarget === "function")
             await disposeTarget();
         else if (
             Symbol.asyncDispose != null && Symbol.asyncDispose in disposeTarget &&
-            disposeTarget[Symbol.asyncDispose] instanceof Function
+            typeof disposeTarget[Symbol.asyncDispose] === "function"
         )
             await disposeTarget[Symbol.asyncDispose]();
         else if (
             Symbol.dispose != null && Symbol.dispose in disposeTarget &&
-            disposeTarget[Symbol.dispose] instanceof Function
+            typeof disposeTarget[Symbol.dispose] === "function"
         )
             disposeTarget[Symbol.dispose]();
-        else if ("dispose" in disposeTarget && disposeTarget.dispose instanceof Function)
+        else if ("dispose" in disposeTarget && typeof disposeTarget.dispose === "function")
             await disposeTarget.dispose();
     } catch (err) {
         console.error(err);
