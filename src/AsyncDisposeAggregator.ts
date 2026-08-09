@@ -70,8 +70,14 @@ export class AsyncDisposeAggregator {
         else if (this._disposed !== false)
             return this._disposed;
 
+        const [tempPromise, acceptPromise] = promiseWithResolver<void>();
+        tempPromise.catch(doNothing);
+        this._disposed = tempPromise;
+
         const disposedPromise = this._dispose();
-        if (this._disposed === false)
+        acceptPromise(disposedPromise);
+
+        if (this._disposed === tempPromise)
             this._disposed = disposedPromise;
 
         return disposedPromise;
@@ -201,3 +207,16 @@ export type AsyncDisposeAggregatorWrappedTarget = (() => void | Promise<void>) |
 } | {
     dispose(): void | Promise<void>
 }>;
+
+function promiseWithResolver<T>(): [promise: Promise<T>, accept: (value: PromiseLike<T> | T) => void] {
+    let _accept: ((value: PromiseLike<T> | T) => void) | undefined = undefined;
+    const promise = new Promise<T>((accept) => {
+        _accept = accept;
+    });
+
+    return [promise, _accept!];
+}
+
+function doNothing() {
+    // do nothing
+}
