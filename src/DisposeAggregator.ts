@@ -20,7 +20,7 @@ import {DisposedError} from "./DisposedError.js";
  * ```
  */
 export class DisposeAggregator {
-    /** @internal */ private readonly _targets: DisposeAggregatorTarget[] = [];
+    /** @internal */ private _targets: DisposeAggregatorTarget[] = [];
     /** @internal */ private _disposed: boolean = false;
 
     public constructor() {
@@ -42,28 +42,52 @@ export class DisposeAggregator {
 
     /**
      * Disposes all the targets that have been added and clears the list of targets.
+     *
+     * After all the targets have been disposed, if any throws an error,
+     * then the error from the first such target will be thrown.
      */
     public dispose(): void {
         if (this._disposed)
             return;
 
-        while (this._targets.length > 0) {
-            let disposeTarget = this._targets.shift();
+        this._disposed = true;
 
-            if (typeof WeakRef !== "undefined" && disposeTarget instanceof WeakRef)
-                disposeTarget = disposeTarget.deref();
+        let firstError: unknown;
+        let hasError: boolean = false;
 
-            if (disposeTarget == null)
-                continue;
-            else if (disposeTarget instanceof Function)
-                disposeTarget();
-            else if (Symbol.dispose != null && Symbol.dispose in disposeTarget && disposeTarget[Symbol.dispose] instanceof Function)
-                disposeTarget[Symbol.dispose]();
-            else if ("dispose" in disposeTarget && disposeTarget.dispose instanceof Function)
-                disposeTarget.dispose();
+        const targets: (DisposeAggregatorTarget | null)[] = this._targets;
+        this._targets = [];
+        for (let i = 0; i < targets.length; i++) {
+            let disposeTarget = targets[i];
+            targets[i] = null;
+
+            try {
+                if (typeof WeakRef !== "undefined" && disposeTarget instanceof WeakRef)
+                    disposeTarget = disposeTarget.deref();
+
+                if (disposeTarget == null || disposeTarget === this)
+                    continue;
+                else if (typeof disposeTarget === "function") {
+                    if (disposeTarget === this.dispose || disposeTarget === this[Symbol.dispose])
+                        continue;
+
+                    disposeTarget();
+                } else if (Symbol.dispose != null && Symbol.dispose in disposeTarget && typeof disposeTarget[Symbol.dispose] === "function")
+                    disposeTarget[Symbol.dispose]();
+                else if ("dispose" in disposeTarget && typeof disposeTarget.dispose === "function")
+                    disposeTarget.dispose();
+            } catch (err) {
+                if (!hasError) {
+                    firstError = err;
+                    hasError = true;
+                }
+            }
         }
 
-        this._disposed = true;
+        targets.length = 0;
+
+        if (hasError)
+            throw firstError;
     }
 
     public [Symbol.dispose](): void {
