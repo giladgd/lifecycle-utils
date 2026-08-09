@@ -3,6 +3,8 @@ import {DisposedError} from "./DisposedError.js";
 /**
  * `AsyncDisposeAggregator` is a utility class that allows you to add multiple items and then dispose them all at once.
  * The items are disposed one by one in the order they were added.
+ * When the `parallel` option is enabled, then all the items are disposed in parallel,
+ * triggered by the order in which they were added.
  * You can add a function to call, an object with a `dispose` method, an object with a `Symbol.dispose` method,
  * an object with a `Symbol.asyncDispose` method, or a Promise that resolves to one of the previous types.
  * To dispose all the items, call `dispose` or use the `Symbol.asyncDispose` symbol.
@@ -26,13 +28,23 @@ import {DisposedError} from "./DisposedError.js";
  * ```
  */
 export class AsyncDisposeAggregator {
-    /** @internal */ private readonly _targets: AsyncDisposeAggregatorTarget[] = [];
-    /** @internal */ private _disposed: boolean = false;
+    /** @internal */ private _targets: AsyncDisposeAggregatorTarget[] = [];
+    /** @internal */ private _disposed: boolean | Promise<void> = false;
+    /** @internal */ private readonly _parallel: boolean;
 
-    public constructor() {
+    public constructor({parallel}: {
+        /**
+         * Whether to dispose all the targets in parallel when the aggregator is disposed.
+         *
+         * Defaults to `false`.
+         */
+        parallel?: boolean
+    } = {}) {
+        this._parallel = parallel ?? false;
         this.add = this.add.bind(this);
         this.dispose = this.dispose.bind(this);
         this[Symbol.asyncDispose] = this[Symbol.asyncDispose].bind(this);
+        this._disposeTarget = this._disposeTarget.bind(this);
     }
 
     /**
@@ -48,49 +60,21 @@ export class AsyncDisposeAggregator {
 
     /**
      * Disposes all the targets that have been added and clears the list of targets.
+     *
+     * After all the targets have been disposed, if any throws an error or rejects,
+     * then the error from the first such target will be thrown.
      */
-    public async dispose(): Promise<void> {
-        if (this._disposed)
-            return;
+    public dispose(): Promise<void> {
+        if (this._disposed === true)
+            return Promise.resolve();
+        else if (this._disposed !== false)
+            return this._disposed;
 
-        this._disposed = true;
-
-        while (this._targets.length > 0) {
-            let disposeTarget = this._targets.shift();
-
-            if (disposeTarget instanceof Promise) {
-                try {
-                    disposeTarget = await disposeTarget;
-                } catch (err) {
-                    /* c8 ignore start */
-                    console.error(err);
-                    continue;
-                } /* c8 ignore stop */
-            }
-
-            if (typeof WeakRef !== "undefined" && disposeTarget instanceof WeakRef)
-                disposeTarget = disposeTarget.deref();
-
-            if (disposeTarget == null)
-                continue;
-            else if (disposeTarget instanceof Function)
-                await disposeTarget();
-            else if (
-                Symbol.asyncDispose != null && Symbol.asyncDispose in disposeTarget &&
-                disposeTarget[Symbol.asyncDispose] instanceof Function
-            )
-                await disposeTarget[Symbol.asyncDispose]();
-            else if (
-                Symbol.dispose != null && Symbol.dispose in disposeTarget &&
-                disposeTarget[Symbol.dispose] instanceof Function
-            )
-                disposeTarget[Symbol.dispose]();
-            else if ("dispose" in disposeTarget && disposeTarget.dispose instanceof Function)
-                await disposeTarget.dispose();
-        }
+        this._disposed = Promise.resolve().then(this._dispose.bind(this));
+        return this._disposed;
     }
 
-    public async [Symbol.asyncDispose](): Promise<void> {
+    public [Symbol.asyncDispose](): Promise<void> {
         return this.dispose();
     }
 
@@ -99,9 +83,103 @@ export class AsyncDisposeAggregator {
     }
 
     /** @internal */
+    private async _dispose() {
+        if (this._parallel) {
+            let firstError: unknown;
+            let errorIndex: number | undefined;
+            const promises: Promise<void>[] = [];
+
+            const targets = this._targets;
+            this._targets = [];
+            for (const target of targets) {
+                try {
+                    const res = this._disposeTarget(target);
+                    if (res instanceof Promise)
+                        promises.push(res);
+                } catch (err) {
+                    if (errorIndex == null) {
+                        firstError = err;
+                        errorIndex = promises.length;
+                    }
+                }
+            }
+
+            targets.length = 0;
+
+            const results = await Promise.allSettled(promises);
+            try {
+                for (let i = 0; i < (errorIndex ?? results.length); i++) {
+                    const result = results[i];
+                    if (result?.status === "rejected")
+                        throw result.reason;
+                }
+
+                if (errorIndex != null)
+                    throw firstError;
+            } finally {
+                this._disposed = true;
+            }
+        } else {
+            let firstError: unknown;
+            let hasError: boolean = false;
+
+            const targets: (AsyncDisposeAggregatorTarget | null)[] = this._targets;
+            this._targets = [];
+            for (let i = 0; i < targets.length; i++) {
+                const target = targets[i]!;
+                targets[i] = null;
+
+                try {
+                    const res = this._disposeTarget(target);
+                    if (res instanceof Promise)
+                        await res;
+                } catch (err) {
+                    if (!hasError) {
+                        firstError = err;
+                        hasError = true;
+                    }
+                }
+            }
+
+            targets.length = 0;
+            this._disposed = true;
+
+            if (hasError)
+                throw firstError;
+        }
+    }
+
+    /** @internal */
     private _ensureNotDisposed(): void {
-        if (this._disposed)
+        if (this._disposed !== false)
             throw new DisposedError();
+    }
+
+    private _disposeTarget(target: AsyncDisposeAggregatorTarget | undefined): Promise<void> | void {
+        if (target instanceof Promise)
+            return target.then(this._disposeTarget);
+        else if (typeof WeakRef !== "undefined" && target instanceof WeakRef)
+            target = target.deref();
+
+        if (target == null || target === this)
+            return;
+        else if (typeof target === "function") {
+            if (target === this.dispose || target === this[Symbol.asyncDispose])
+                return;
+
+            return target();
+        } else if (
+            Symbol.asyncDispose != null && Symbol.asyncDispose in target &&
+            typeof target[Symbol.asyncDispose] === "function"
+        )
+            return target[Symbol.asyncDispose]();
+        else if (
+            Symbol.dispose != null && Symbol.dispose in target &&
+            typeof target[Symbol.dispose] === "function"
+        )
+            target[Symbol.dispose]();
+        else if ("dispose" in target && typeof target.dispose === "function")
+            return target.dispose();
     }
 }
 

@@ -253,6 +253,8 @@ console.log(eventRelay2.disposed === true); // true
 ### `AsyncDisposeAggregator`
 `AsyncDisposeAggregator` is a utility class that allows you to add multiple items and then dispose them all at once.
 The items are disposed one by one in the order they were added.
+When the `parallel` option is enabled, then all the items are disposed in parallel,
+triggered by the order in which they were added.
 
 You can add a function to call, an object with a `dispose` method, an object with a `Symbol.dispose` method,
 an object with a `Symbol.asyncDispose` method, or a Promise that resolves to one of the previous types.
@@ -275,6 +277,34 @@ disposeAggregator.add(async () => {
 });
 
 disposeAggregator.dispose();
+```
+
+With the `parallel` option enabled:
+```typescript
+import {AsyncDisposeAggregator, EventRelay} from "lifecycle-utils";
+
+const disposeAggregator = new AsyncDisposeAggregator({parallel: true});
+
+const eventRelay = new EventRelay<string>();
+disposeAggregator.add(eventRelay);
+
+disposeAggregator.add(async () => {
+    console.log("1");
+    await new Promise(resolve => setTimeout(resolve, 100));
+    console.log("4");
+});
+disposeAggregator.add(async () => {
+    console.log("2");
+    await new Promise(resolve => setTimeout(resolve, 0));
+    console.log("3");
+});
+
+disposeAggregator.dispose();
+// will print:
+// 1
+// 2
+// 3
+// 4
 ```
 
 ### `DisposableHandle`
