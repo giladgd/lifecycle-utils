@@ -382,6 +382,22 @@ describe("withLock", () => {
         void (checkScopeType([1, true, null]) satisfies InvalidLockType);
         void (checkScopeType([]) satisfies InvalidLockType);
 
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        class test {
+            public test1() {
+                isLockActive([1, this, 2, 3]);
+                isLockActive([this, 1, 2, 3]);
+                isLockActive([1, 2, 3, this, func]);
+                isLockActive([1, 2, 3, func]);
+                isLockActive([1, 2, 3, this.test1]);
+                isLockActive([1, 2, 3, this.test1, this]);
+                isLockActive([1, 2, 3, this, obj3]);
+                isLockActive([1, 2, 3, obj3]);
+                isLockActive([this]);
+                // isLockActive([]);
+            }
+        }
+
         // isLockActive([1, 2, 3]);
         // isLockActive([1, true, null]);
         // isLockActive([]);

@@ -360,7 +360,8 @@ export type ValidLockScope<T extends readonly unknown[] = readonly unknown[]> =
 type IncludesObject<T extends readonly unknown[]> =
     true extends (
         {
-            [K in keyof T]: readonly [T[K]] extends readonly [object]
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            [K in keyof T]: readonly [T[K]] extends readonly [infer U extends object]
                 ? true
                 : false
         }[keyof T]
