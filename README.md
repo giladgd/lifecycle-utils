@@ -698,6 +698,62 @@ console.log(disposed2); // true
 console.log(disposed2.finalized); // true
 ```
 
+### `sleep`
+Wait for a given duration.
+An optional `AbortSignal` can be provided to abort the wait.
+
+```typescript
+import {sleep} from "lifecycle-utils";
+
+await sleep(1000);
+
+const controller = new AbortController();
+
+const promise = sleep(1000, controller.signal);
+controller.abort();
+
+await promise; // rejected with controller.signal.reason
+```
+
+### `AbortablePromise`
+A Promise that can be rejected by an optional `AbortSignal`.
+
+The executor can return a cleanup callback that will be called when the promise is resolved, rejected, or aborted.
+
+```typescript
+import {AbortablePromise} from "lifecycle-utils";
+
+const controller = new AbortController();
+
+const promise = new AbortablePromise<number>(controller.signal, (resolve) => {
+    const timeout = setTimeout(() => resolve(42), 1000);
+
+    return () => {
+        clearTimeout(timeout);
+    };
+});
+
+controller.abort();
+
+await promise; // rejected with controller.signal.reason
+```
+
+An existing Promise can be wrapped with an abort signal using `AbortablePromise.withSignal`:
+```typescript
+const promise = AbortablePromise.withSignal(
+    controller.signal,
+    doSomething()
+);
+```
+
+`AbortablePromise` also provides abortable versions of `Promise.all`, `Promise.race`, `Promise.any`, and `Promise.allSettled`:
+```typescript
+const res = await AbortablePromise.all(controller.signal, [
+    promise1,
+    promise2
+]);
+```
+
 ## Contributing
 To contribute to `lifecycle-utils` see [CONTRIBUTING.md](https://github.com/giladgd/lifecycle-utils/blob/master/CONTRIBUTING.md).
 
