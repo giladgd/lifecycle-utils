@@ -401,6 +401,7 @@ describe("withLock", () => {
         // isLockActive([1, 2, 3]);
         // isLockActive([1, true, null]);
         // isLockActive([]);
+        // isLockActive([this]);
     });
 
     test("withLock requires a callback", async () => {

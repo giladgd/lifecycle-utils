@@ -15,3 +15,4 @@ export * from "./ScopeExit.js";
 export * from "./DisposedError.js";
 export * from "./registerFinalizer.js";
 export * from "./AbortablePromise.js";
+export * from "./withSingleFlight.js";

@@ -754,6 +754,92 @@ const res = await AbortablePromise.all(controller.signal, [
 ]);
 ```
 
+### `withSingleFlight`
+Calling `withSingleFlight` runs its callback at most once in parallel for the given `scope` values,
+with parallel callers sharing the active callback's result.
+The result is only shared with other callers while the callback is running; later calls will run the callback again.
+
+The callback holds an exclusive lock for the given `scope` while it runs.
+The callback accepts a `signal` argument that indicates when it should abort its execution.
+Aborting a caller makes its promise reject immediately,
+but only aborts the running callback's `signal` when no other callers are waiting for its result.
+
+```typescript
+import {withSingleFlight, sleep} from "lifecycle-utils";
+
+const scope = {};
+let callCount = 0;
+
+async function getValue() {
+    return await withSingleFlight([scope, "myKey"], async () => {
+        const value = ++callCount;
+        await sleep(100);
+        return value;
+    });
+}
+
+const first = getValue();
+await sleep(10);
+const second = getValue();
+await sleep(10);
+const third = getValue();
+
+console.log(await first); // 1
+console.log(await second); // 1
+console.log(await third); // 1
+console.log(callCount); // 1
+
+console.log(await getValue()); // 2
+console.log(callCount); // 2
+```
+
+```typescript
+import {withSingleFlight, sleep} from "lifecycle-utils";
+
+const scope = {};
+let callCount = 0;
+let aborted = false;
+let done = false;
+
+function getValue(signal?: AbortSignal) {
+    return withSingleFlight([scope, "myKey"], signal, async (signal) => {
+        signal.addEventListener("abort", () => {
+            aborted = true;
+        });
+
+        const value = ++callCount;
+        await sleep(100);
+
+        done = true;
+        return value;
+    });
+}
+
+const firstController = new AbortController();
+const secondController = new AbortController();
+
+const first = getValue(firstController.signal);
+await sleep(10);
+const second = getValue(secondController.signal);
+
+firstController.abort(new Error("Canceled"));
+
+try {
+    await first;
+} catch (err) {
+    console.log((err as Error).message); // "Canceled"
+}
+
+console.log(callCount); // 1
+console.log(done); // false
+console.log(aborted); // false
+
+console.log(await second); // 1
+console.log(callCount); // 1
+console.log(done); // true
+console.log(aborted); // false
+```
+
 ## Contributing
 To contribute to `lifecycle-utils` see [CONTRIBUTING.md](https://github.com/giladgd/lifecycle-utils/blob/master/CONTRIBUTING.md).
 
