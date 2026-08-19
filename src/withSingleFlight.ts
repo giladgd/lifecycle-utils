@@ -141,7 +141,7 @@ export function withSingleFlight<ReturnType, const Scope extends readonly any[]>
 
         const promise = withLock(
             scopeClone,
-            callerSignal == null // if the first flight doesn't supply a signal, then it won't even get canceled
+            callerSignal == null // if the first flight doesn't supply a signal, then it won't ever get canceled
                 ? undefined
                 : abortController.signal,
             () => callback(abortController.signal)

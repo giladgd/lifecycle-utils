@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-expressions */
 import {describe, expect, expectTypeOf, test, vi} from "vitest";
-import {EventRelay, DisposedError} from "../src/index.js";
+import {EventRelay, DisposedError, EventRelayListenerHandle} from "../src/index.js";
 
 describe("EventRelay", () => {
     test("events are dispatched", async () => {
@@ -81,6 +81,83 @@ describe("EventRelay", () => {
         expect(onStateChangeSpy1).toHaveBeenCalledWith("something");
 
         expect(eventHandle1.disposed).toBe(true);
+    });
+
+    test("once listener only removes its own registration", () => {
+        const eventRelay = new EventRelay<string>();
+        const callback = vi.fn();
+
+        const regularHandle = eventRelay.createListener(callback);
+        const onceHandle = eventRelay.createOnceListener(callback);
+
+        expect(eventRelay.listenerCount).toBe(1);
+        expect(regularHandle.disposed).toBe(false);
+        expect(onceHandle.disposed).toBe(false);
+
+        eventRelay.dispatchEvent("something");
+
+        expect(callback).toHaveBeenCalledTimes(1);
+        expect(callback).toHaveBeenCalledWith("something");
+
+        expect(regularHandle.disposed).toBe(false);
+        expect(onceHandle.disposed).toBe(true);
+        expect(eventRelay.listenerCount).toBe(1);
+
+        eventRelay.dispatchEvent("something2");
+
+        expect(callback).toHaveBeenCalledTimes(2);
+        expect(callback).toHaveBeenLastCalledWith("something2");
+
+        expect(regularHandle.disposed).toBe(false);
+        expect(eventRelay.listenerCount).toBe(1);
+    });
+
+    test("multiple once registrations of the same callback are only called once", () => {
+        const eventRelay = new EventRelay<string>();
+        const callback = vi.fn();
+
+        const handle1 = eventRelay.createOnceListener(callback);
+        const handle2 = eventRelay.createOnceListener(callback);
+
+        expect(eventRelay.listenerCount).toBe(1);
+
+        eventRelay.dispatchEvent("something");
+
+        expect(callback).toHaveBeenCalledTimes(1);
+        expect(callback).toHaveBeenCalledWith("something");
+
+        expect(handle1.disposed).toBe(true);
+        expect(handle2.disposed).toBe(true);
+        expect(eventRelay.listenerCount).toBe(0);
+
+        eventRelay.dispatchEvent("something2");
+
+        expect(callback).toHaveBeenCalledTimes(1);
+    });
+
+    test("re-registering a disposed listener during dispatch does not remove the new registration", () => {
+        const eventRelay = new EventRelay<string>();
+
+        const callback = vi.fn();
+        let handle: EventRelayListenerHandle;
+
+        eventRelay.createListener(() => {
+            handle.dispose();
+            handle = eventRelay.createListener(callback);
+        });
+
+        handle = eventRelay.createListener(callback);
+
+        eventRelay.dispatchEvent("first");
+
+        expect(callback).toHaveBeenCalledTimes(1);
+        expect(callback).toHaveBeenLastCalledWith("first");
+        expect(eventRelay.listenerCount).toBe(2);
+
+        eventRelay.dispatchEvent("second");
+
+        expect(callback).toHaveBeenCalledTimes(2);
+        expect(callback).toHaveBeenLastCalledWith("second");
     });
 
     test("clearListeners works", async () => {

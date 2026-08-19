@@ -30,13 +30,14 @@ import {DisposedError} from "./DisposedError.js";
  * ```
  */
 export class EventRelay<T> {
-    /** @internal */ private readonly _listenerCallbacks: Map<((data: T) => void), Set<EventRelayListenerHandle>>;
+    /** @internal */ public readonly _callbacks: Map<((data: T) => void), Set<EventRelayListenerHandle>>;
     /** @internal */ private _disposed: boolean = false;
 
     public constructor() {
-        this._listenerCallbacks = new Map<((data: T) => void), Set<EventRelayListenerHandle>>();
+        this._callbacks = new Map<((data: T) => void), Set<EventRelayListenerHandle>>();
 
         this.createListener = this.createListener.bind(this);
+        this.createOnceListener = this.createOnceListener.bind(this);
         this.dispatchEvent = this.dispatchEvent.bind(this);
         this.clearListeners = this.clearListeners.bind(this);
         this.dispose = this.dispose.bind(this);
@@ -44,40 +45,27 @@ export class EventRelay<T> {
     }
 
     public createListener(callback: ((data: T) => void)) {
-        this._ensureNotDisposed();
-
-        const handle = EventRelayListenerHandle._create(() => {
-            const handles = this._listenerCallbacks.get(callback);
-
-            if (handles != null) {
-                handles.delete(handle);
-
-                if (handles.size === 0)
-                    this._listenerCallbacks.delete(callback);
-            }
-        });
-
-        if (!this._listenerCallbacks.has(callback))
-            this._listenerCallbacks.set(callback, new Set<EventRelayListenerHandle>());
-
-        this._listenerCallbacks.get(callback)!.add(handle);
-
-        return handle;
+        return this._createListener(callback, false);
     }
 
     public createOnceListener(callback: ((data: T) => void)) {
-        this._ensureNotDisposed();
-
-        const handle = this.createListener((data: T) => {
-            handle.dispose();
-            callback(data);
-        });
-
-        return handle;
+        return this._createListener(callback, true);
     }
 
     public dispatchEvent(data: T) {
-        for (const [listenerCallback] of Array.from(this._listenerCallbacks.entries())) {
+        for (const [listenerCallback, handles] of Array.from(this._callbacks.entries())) {
+            if (handles.size !== 0) {
+                for (const handle of handles) {
+                    if (handle._once) {
+                        handles.delete(handle);
+                        handle._markDisposed();
+                    }
+                }
+
+                if (handles.size === 0)
+                    this._callbacks.delete(listenerCallback);
+            }
+
             try {
                 listenerCallback(data);
             } catch (err) {
@@ -92,7 +80,7 @@ export class EventRelay<T> {
     }
 
     public get listenerCount() {
-        return this._listenerCallbacks.size;
+        return this._callbacks.size;
     }
 
     public get disposed() {
@@ -109,14 +97,32 @@ export class EventRelay<T> {
     }
 
     /** @internal */
-    private _clearListeners() {
-        for (const handles of Array.from(this._listenerCallbacks.values())) {
-            for (const handle of Array.from(handles)) {
-                handle.dispose();
-            }
+    private _createListener(callback: ((data: T) => void), once: boolean) {
+        this._ensureNotDisposed();
+
+        const handle = EventRelayListenerHandle._create(this, callback, once);
+
+        let handles = this._callbacks.get(callback);
+        if (handles == null) {
+            handles = new Set();
+            this._callbacks.set(callback, handles);
         }
 
-        this._listenerCallbacks.clear();
+        handles.add(handle);
+
+        return handle;
+    }
+
+    /** @internal */
+    private _clearListeners() {
+        for (const handles of this._callbacks.values()) {
+            for (const handle of handles)
+                handle._markDisposed();
+
+            handles.clear();
+        }
+
+        this._callbacks.clear();
     }
 
     /** @internal */
@@ -127,21 +133,36 @@ export class EventRelay<T> {
 }
 
 export class EventRelayListenerHandle {
-    /** @internal */
-    private _dispose: (() => void) | null;
+    /** @internal */ private _relay: undefined | EventRelay<any>;
+    /** @internal */ private _callback: undefined | ((data: any) => void);
+    /** @internal */ public readonly _once: boolean;
 
-    private constructor(dispose: () => void) {
-        this._dispose = dispose;
+    private constructor(
+        relay: EventRelay<any>,
+        callback: (data: any) => void,
+        once: boolean
+    ) {
+        this._relay = relay;
+        this._callback = callback;
+        this._once = once;
 
         this.dispose = this.dispose.bind(this);
         this[Symbol.dispose] = this[Symbol.dispose].bind(this);
     }
 
     public dispose() {
-        if (this._dispose != null) {
-            this._dispose();
-            this._dispose = null;
+        if (this._relay == null || this._callback == null)
+            return;
+
+        const handles = this._relay._callbacks.get(this._callback);
+        if (handles != null) {
+            handles.delete(this);
+
+            if (handles.size === 0)
+                this._relay._callbacks.delete(this._callback);
         }
+
+        this._markDisposed();
     }
 
     public [Symbol.dispose]() {
@@ -149,11 +170,17 @@ export class EventRelayListenerHandle {
     }
 
     public get disposed() {
-        return this._dispose == null;
+        return this._relay == null;
     }
 
     /** @internal */
-    public static _create(dispose: () => void) {
-        return new EventRelayListenerHandle(dispose);
+    public _markDisposed() {
+        this._relay = undefined;
+        this._callback = undefined;
+    }
+
+    /** @internal */
+    public static _create(relay: EventRelay<any>, callback: (data: any) => void, once: boolean) {
+        return new EventRelayListenerHandle(relay, callback, once);
     }
 }

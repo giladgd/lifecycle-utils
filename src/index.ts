@@ -1,5 +1,7 @@
 export * from "./withLock.js";
+export * from "./withSingleFlight.js";
 export * from "./EventRelay.js";
+export * from "./ScopedEventRelay.js";
 export * from "./LongTimeout.js";
 export * from "./State.js";
 export * from "./DisposeAggregator.js";
@@ -15,4 +17,4 @@ export * from "./ScopeExit.js";
 export * from "./DisposedError.js";
 export * from "./registerFinalizer.js";
 export * from "./AbortablePromise.js";
-export * from "./withSingleFlight.js";
+

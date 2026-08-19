@@ -228,6 +228,47 @@ Something happened: eat a cookie
 Done notifying listeners
 ```
 
+### `ScopedEventRelay`
+A scoped event relay.
+
+Create a listener for a given scope with `createListener` and dispatch events for a given scope with `dispatchEvent`.
+
+For each supported event type, create a new instance of `ScopedEventRelay` and expose it as a property,
+where the scope identifies the target the event belongs to.
+
+A scope consists of one or more values that identify the target or context of an event, such as a `clientId` string.
+
+```typescript
+import {ScopedEventRelay} from "lifecycle-utils";
+
+class Clients {
+    public readonly onClientMessage = new ScopedEventRelay<[clientId: string], string>();
+
+    public sendMessage(clientId: string, message: string) {
+        this.onClientMessage.dispatchEvent([clientId], message);
+        console.log("Done notifying listeners");
+    }
+}
+
+const clients = new Clients();
+clients.onClientMessage.createListener(["client1"], (message) => {
+    console.log(`Message from client1: ${message}`);
+});
+clients.onClientMessage.createListener(["client2"], (message) => {
+    console.log(`Message from client2: ${message}`);
+});
+clients.sendMessage("client1", "eat a cookie");
+clients.sendMessage("client2", "eat a sandwich");
+```
+
+Will print this:
+```
+Message from client1: eat a cookie
+Done notifying listeners
+Message from client2: eat a sandwich
+Done notifying listeners
+```
+
 ### `DisposeAggregator`
 `DisposeAggregator` is a utility class that allows you to add multiple items and then dispose them all at once.
 
