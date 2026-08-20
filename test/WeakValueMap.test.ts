@@ -1,9 +1,9 @@
 import {describe, expect, test} from "vitest";
-import {WeakValueMap} from "../src/WeakValueMap.js";
+import {WeakValueMap} from "../src/index.js";
 import {waitForGarbageCollection} from "./utils/gc.js";
 
 describe("WeakValueMap", () => {
-    test("sanity", {timeout: 1000 * 60 * 3}, async () => {
+    test("sanity", async () => {
         const map = new WeakValueMap<string, object>();
 
         let obj1: {} | null = {};
@@ -11,13 +11,11 @@ describe("WeakValueMap", () => {
         let obj3: {} | null = {};
         const obj4: {} | null = {};
 
-
         map.set("rootA", obj1);
         map.set("rootB", {});
         map.set("rootB", obj2);
         map.set("rootC", obj3);
         map.set("rootD", obj4);
-
 
         {
             const expectedEntries = [
@@ -26,17 +24,16 @@ describe("WeakValueMap", () => {
                 ["rootC", obj3],
                 ["rootD", obj4]
             ];
-            map.forEach(function (this: null, value, keys, mapArg) {
-                expect(this === null).toBe(true);
+            map.forEach(function (this: null, value, key, mapArg) {
+                expect(this).toBe(null);
                 expect(mapArg).toBe(map);
-
                 const firstEntry = expectedEntries.shift();
                 expect(firstEntry).not.toBe(undefined);
-                expect(keys).to.eql(firstEntry![0]);
+                expect(key).to.eql(firstEntry![0]);
                 expect(value).toBe(firstEntry![1]);
             }, null);
-            map.forEach(function (this: typeof map, value, keys, mapArg) {
-                expect(this === map).toBe(true);
+            map.forEach(function (this: undefined, _value, _key, mapArg) {
+                expect(this).toBe(undefined);
                 expect(mapArg).toBe(map);
             });
             expect([...map.keys()]).to.eql([
@@ -59,7 +56,6 @@ describe("WeakValueMap", () => {
             ]);
         }
 
-
         expect(map.size).toBe(4);
         await waitForGarbageCollection(obj1, () => {
             obj1 = null;
@@ -67,7 +63,7 @@ describe("WeakValueMap", () => {
         expect(map.size).toBe(3);
         expect(map.has("rootA")).toBe(false);
 
-        expect(map.get("rootB") === obj2).toBe(true);
+        expect(map.get("rootB")).toBe(obj2);
         await waitForGarbageCollection(obj2, () => {
             obj2 = null;
         });
@@ -82,8 +78,9 @@ describe("WeakValueMap", () => {
         expect(map.has("rootC")).toBe(false);
 
         expect(map.has("rootD")).toBe(true);
-        expect(map.get("rootD") === obj4).toBe(true);
-        map.delete("rootD");
+        expect(map.get("rootD")).toBe(obj4);
+        expect(map.delete("rootD")).toBe(true);
+        expect(map.delete("rootD")).toBe(false);
         expect(map.size).toBe(0);
         expect(map.has("rootD")).toBe(false);
 
@@ -103,5 +100,55 @@ describe("WeakValueMap", () => {
         expect([...map2]).to.eql([
             ["rootD", obj4]
         ]);
+    });
+
+    test("allows the same object to be used as both the key and value", () => {
+        const map = new WeakValueMap<object, object>();
+        const value = {};
+
+        expect(() => map.set(value, value)).not.toThrow();
+        expect(map.get(value)).toBe(value);
+    });
+
+    test("maintains independent finalization registrations", async () => {
+        let value: object | null = {};
+
+        const replacementAfterSet = {};
+        const replacedMap = new WeakValueMap<string, object>();
+        replacedMap.set("key", value);
+        replacedMap.set("key", replacementAfterSet);
+
+        const duplicateValueMap = new WeakValueMap<string, object>();
+        duplicateValueMap.set("a", value);
+        duplicateValueMap.set("b", value);
+        expect(duplicateValueMap.delete("a")).toBe(true);
+
+        const replacementAfterDelete = {};
+        const deletedMap = new WeakValueMap<string, object>();
+        deletedMap.set("key", value);
+        expect(deletedMap.delete("key")).toBe(true);
+        deletedMap.set("key", replacementAfterDelete);
+
+        const replacementAfterClear = {};
+        const clearedMap = new WeakValueMap<string, object>();
+        clearedMap.set("key", value);
+        clearedMap.clear();
+        clearedMap.set("key", replacementAfterClear);
+
+        await waitForGarbageCollection(value, () => {
+            value = null;
+        });
+
+        expect(replacedMap.size).toBe(1);
+        expect(replacedMap.get("key")).toBe(replacementAfterSet);
+
+        expect(duplicateValueMap.size).toBe(0);
+        expect(duplicateValueMap.has("b")).toBe(false);
+
+        expect(deletedMap.size).toBe(1);
+        expect(deletedMap.get("key")).toBe(replacementAfterDelete);
+
+        expect(clearedMap.size).toBe(1);
+        expect(clearedMap.get("key")).toBe(replacementAfterClear);
     });
 });

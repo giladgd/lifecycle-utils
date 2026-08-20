@@ -11,6 +11,8 @@ export function waitForGarbageCollection<T extends object>(value: T, afterTrackC
 
     afterTrackCallback();
 
+    (value as any) = undefined; // remove the value from closure
+
     return Promise.all([
         runGarbageCollector(tracker),
         promise

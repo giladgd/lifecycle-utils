@@ -7,17 +7,20 @@ import {MultiKeyMap, ReadonlyMultiKeyMap} from "./MultiKeyMap.js";
  *
  * When a value is garbage collected, it is automatically removed from the map.
  */
-export class WeakValueMultiKeyMap<const Key extends readonly any[], const V extends object> {
-    /** @internal */ private readonly _map = new MultiKeyMap<Key, InternalWeakValue<V>>();
+export class WeakValueMultiKeyMap<const Key extends readonly any[], const Value extends object> {
+    /** @internal */ private readonly _map = new MultiKeyMap<Key, InternalWeakValue<Key, Value>>();
+    /** @internal */ private readonly _registry: FinalizationRegistry<InternalWeakValue<Key, Value>>;
 
     public constructor(
-        entries?: readonly (readonly [key: Key, value: V])[] |
-            MultiKeyMap<Key, V> |
-            ReadonlyMultiKeyMap<Key, V> |
-            WeakValueMultiKeyMap<Key, V> |
-            ReadonlyWeakValueMultiKeyMap<Key, V> |
+        entries?: readonly (readonly [key: Key, value: Value])[] |
+            MultiKeyMap<Key, Value> |
+            ReadonlyMultiKeyMap<Key, Value> |
+            WeakValueMultiKeyMap<Key, Value> |
+            ReadonlyWeakValueMultiKeyMap<Key, Value> |
             null
     ) {
+        this._registry = new FinalizationRegistry(this._finalize.bind(this));
+
         if (entries != null) {
             for (const [key, value] of entries)
                 this.set(key, value);
@@ -29,21 +32,16 @@ export class WeakValueMultiKeyMap<const Key extends readonly any[], const V exte
      *
      * Time complexity: O(1), given that the length of the key is constant.
      */
-    public set(key: Readonly<Key>, value: V): this {
+    public set(key: Readonly<Key>, value: Value): this {
         const currentWeakValue = this._map.get(key);
-        if (currentWeakValue != null) {
-            const currentValue = currentWeakValue.ref.deref();
+        if (currentWeakValue != null)
+            this._registry.unregister(currentWeakValue);
 
-            if (currentValue != null)
-                currentWeakValue.tracker.unregister(currentValue);
-        }
-
-        const weakValue: InternalWeakValue<V> = {
-            ref: new WeakRef(value),
-            tracker: null as any // will be set below
+        const weakValue: InternalWeakValue<Key, Value> = {
+            key: currentWeakValue?.key ?? key.slice() as any as Key,
+            ref: new WeakRef(value)
         };
-        weakValue.tracker = new FinalizationRegistry<Readonly<Key>>(this._finalize.bind(this, weakValue));
-        weakValue.tracker.register(value, key.slice());
+        this._registry.register(value, weakValue, weakValue);
 
         this._map.set(key, weakValue);
         return this;
@@ -54,7 +52,7 @@ export class WeakValueMultiKeyMap<const Key extends readonly any[], const V exte
      *
      * Time complexity: O(1), given that the length of the key is constant.
      */
-    public get(key: Readonly<Key>): V | undefined {
+    public get(key: Readonly<Key>): Value | undefined {
         const weakValue = this._map.get(key);
         if (weakValue == null)
             return undefined;
@@ -62,6 +60,7 @@ export class WeakValueMultiKeyMap<const Key extends readonly any[], const V exte
         const value = weakValue.ref.deref();
         /* c8 ignore start */
         if (value == null) {
+            this._registry.unregister(weakValue);
             this._map.delete(key);
             return undefined;
         } /* c8 ignore stop */
@@ -88,10 +87,7 @@ export class WeakValueMultiKeyMap<const Key extends readonly any[], const V exte
         if (weakValue == null)
             return false;
 
-        const value = weakValue.ref.deref();
-        if (value != null)
-            weakValue.tracker.unregister(value);
-
+        this._registry.unregister(weakValue);
         this._map.delete(key);
         return true;
     }
@@ -100,11 +96,9 @@ export class WeakValueMultiKeyMap<const Key extends readonly any[], const V exte
      * Clear all values from the map.
      */
     public clear(): void {
-        for (const [, weakValue] of this._map.entries()) {
-            const value = weakValue.ref.deref();
-            if (value != null)
-                weakValue.tracker.unregister(value);
-        }
+        for (const [, weakValue] of this._map.entries())
+            this._registry.unregister(weakValue);
+
         this._map.clear();
     }
 
@@ -118,11 +112,15 @@ export class WeakValueMultiKeyMap<const Key extends readonly any[], const V exte
     /**
      * Get an iterator for all entries in the map.
      */
-    public *entries(): Generator<[key: Key, value: V]> {
+    public *entries(): Generator<[key: Key, value: Value]> {
         for (const [key, weakValue] of this._map.entries()) {
             const value = weakValue.ref.deref();
             if (value != null)
                 yield [key, value];
+            else {/* c8 ignore start */
+                this._registry.unregister(weakValue);
+                this._map.delete(key);
+            } /* c8 ignore stop */
         }
     }
 
@@ -137,7 +135,7 @@ export class WeakValueMultiKeyMap<const Key extends readonly any[], const V exte
     /**
      * Get an iterator for all values in the map.
      */
-    public *values(): Generator<V> {
+    public *values(): Generator<Value> {
         for (const [, value] of this.entries())
             yield value;
     }
@@ -145,32 +143,29 @@ export class WeakValueMultiKeyMap<const Key extends readonly any[], const V exte
     /**
      * Call a function for each entry in the map.
      */
-    public forEach(callbackfn: (value: V, key: Key, map: this) => void, thisArg?: any): void {
-        for (const [key, value] of this.entries()) {
-            if (thisArg !== undefined)
-                callbackfn.call(thisArg, value, key, this);
-            else
-                callbackfn.call(this, value, key, this);
-        }
+    public forEach(callbackfn: (value: Value, key: Key, map: this) => void, thisArg?: any): void {
+        for (const [key, value] of this.entries())
+            callbackfn.call(thisArg, value, key, this);
     }
 
-    public [Symbol.iterator](): Generator<[key: Key, value: V]> {
+    public [Symbol.iterator](): Generator<[key: Key, value: Value]> {
         return this.entries();
     }
 
     /** @internal */
-    private _finalize(value: InternalWeakValue<V>, key: Readonly<Key>) {
-        const weakValue = this._map.get(key);
-        if (weakValue === value)
-            this._map.delete(key);
+    private _finalize(entry: InternalWeakValue<Key, Value>) {
+        if (this._map.get(entry.key) === entry)
+            this._map.delete(entry.key);
     }
 }
 
 export type ReadonlyWeakValueMultiKeyMap<
     Key extends readonly any[], V extends object
-> = Omit<WeakValueMultiKeyMap<Key, V>, "set" | "delete" | "clear">;
+> = Omit<WeakValueMultiKeyMap<Key, V>, "set" | "delete" | "clear" | "forEach"> & {
+    forEach(callbackfn: (value: V, key: Key, map: ReadonlyWeakValueMultiKeyMap<Key, V>) => void, thisArg?: any): void
+};
 
-type InternalWeakValue<T extends object> = {
-    ref: WeakRef<T>,
-    tracker: FinalizationRegistry<readonly any[]>
+type InternalWeakValue<Key extends readonly any[], T extends object> = {
+    key: Readonly<Key>,
+    ref: WeakRef<T>
 };
