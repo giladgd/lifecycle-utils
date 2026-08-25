@@ -881,6 +881,55 @@ console.log(done); // true
 console.log(aborted); // false
 ```
 
+### `Retainer`
+A utility for retaining a resource while it's being used,
+and for draining it by blocking new retain requests and waiting for existing retains to be released.
+
+`tryRetain` acquires a retain handle if no drain is active or pending.
+`acquireDrain` prevents new retain handles from being acquired, waits for existing retain handles to be released,
+and resolves with a drain handle that keeps the retainer drained until disposed.
+
+Multiple drain handles can be held in parallel.
+New retain handles are allowed again when the last drain handle is disposed.
+```typescript
+import {Retainer, sleep} from "lifecycle-utils";
+
+class MyClass {
+    private _retainer = new Retainer();
+
+    async useResource() {
+        using handle = this._retainer.tryRetain(() => new Error("Resource is draining"));
+        
+        console.log("using resource");
+        await sleep(1000);
+        console.log("done using resource");
+    }
+
+    async drain() {
+        console.log("awaiting drain");
+        using drain = await this._retainer.acquireDrain();
+
+        // no retained usages are active while the drain handle is held
+        console.log("drain started");
+        await sleep(1000);
+    }
+}
+
+const myClass = new MyClass();
+
+const usePromise = myClass.useResource();
+const drainPromise = myClass.drain();
+
+await myClass.useResource().catch(console.log);
+await Promise.all([usePromise, drainPromise]);
+
+// using resource
+// awaiting drain
+// Error: Resource is draining
+// done using resource
+// drain started
+```
+
 ## Contributing
 To contribute to `lifecycle-utils` see [CONTRIBUTING.md](https://github.com/giladgd/lifecycle-utils/blob/master/CONTRIBUTING.md).
 
