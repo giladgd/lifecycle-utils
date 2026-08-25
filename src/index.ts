@@ -18,4 +18,5 @@ export * from "./DisposedError.js";
 export * from "./registerFinalizer.js";
 export * from "./AbortablePromise.js";
 export * from "./Retainer.js";
+export * from "./ScopedRetainer.js";
 

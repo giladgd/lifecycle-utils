@@ -930,6 +930,49 @@ await Promise.all([usePromise, drainPromise]);
 // drain started
 ```
 
+### `ScopedRetainer`
+A scoped version of [`Retainer`](#retainer) that coordinates retains and drains independently for each scope.
+
+A scope consists of one or more values that identify a resource or context to retain or drain.
+Draining one scope does not affect other scopes.
+```typescript
+import {ScopedRetainer, sleep} from "lifecycle-utils";
+
+const retainer = new ScopedRetainer<[clientId: string]>();
+
+async function useClient(clientId: string) {
+    using handle = retainer.tryRetain([clientId], () => new Error(clientId + " is draining"));
+
+    console.log("using " + clientId);
+    await sleep(1000);
+    console.log("done using " + clientId);
+}
+
+async function drainClient(clientId: string) {
+    console.log("awaiting drain for " + clientId);
+    using drain = await retainer.acquireDrain([clientId]);
+
+    // no retained usages for this client are active while the drain handle is held
+    console.log("drain started for " + clientId);
+    await sleep(1000);
+}
+
+const usePromise = useClient("client1");
+const drainPromise = drainClient("client1");
+
+await useClient("client1").catch(console.log);
+await useClient("client2");
+await Promise.all([usePromise, drainPromise]);
+
+// using client1
+// awaiting drain for client1
+// Error: client1 is draining
+// using client2
+// done using client1
+// drain started for client1
+// done using client2
+```
+
 ## Contributing
 To contribute to `lifecycle-utils` see [CONTRIBUTING.md](https://github.com/giladgd/lifecycle-utils/blob/master/CONTRIBUTING.md).
 
