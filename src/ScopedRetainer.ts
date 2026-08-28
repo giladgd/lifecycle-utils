@@ -147,6 +147,11 @@ export class ScopedRetainer<const Scope extends readonly any[]> {
         }
     }
 
+    /** Get the number of active retains for a given `scope` */
+    public getActiveRetains(scope: Readonly<Scope>): number {
+        return this._states.get(scope)?.[RetainerStateIndex.retains] ?? 0;
+    }
+
     public getIsDraining(scope: Readonly<Scope>) {
         const state = this._states.get(scope);
         return state != null && state[RetainerStateIndex.drains] !== 0;

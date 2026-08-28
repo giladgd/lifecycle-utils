@@ -15,6 +15,7 @@ describe("ScopedRetainer", () => {
 
             expect(handle1).toBeInstanceOf(ScopedRetainerHandle);
             expect(handle2).toBeInstanceOf(ScopedRetainerHandle);
+            expect(retainer.getActiveRetains(scope)).toBe(2);
             expect(handle1!.disposed).toBe(false);
             expect(handle2!.disposed).toBe(false);
             expect(retainer.getIsDraining(scope)).toBe(false);
