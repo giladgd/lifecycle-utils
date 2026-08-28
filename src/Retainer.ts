@@ -122,6 +122,11 @@ export class Retainer {
         }));
     }
 
+    /** The number of active retains */
+    public get activeRetains(): number {
+        return this._retains;
+    }
+
     public get isDraining() {
         return this._drains !== 0;
     }
